@@ -35,7 +35,7 @@ from pathlib import Path
 SHELL = shutil.which("bash")
 
 SCHEMA = 1
-VERSION = "3.0.2"
+VERSION = "3.0.3"
 STATES = ["proposed", "ready", "locked", "dispatched", "done", "done_unverified",
           "done_user_reported", "failed", "unknown", "blocked"]
 TERMINAL_OK = {"done", "done_user_reported"}

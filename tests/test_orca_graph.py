@@ -906,3 +906,17 @@ def test_manual_lock_registers_store_and_starts_the_watch_daemon(tmp_path):
             os.kill(int((home / "daemon.lock").read_text()), signal.SIGTERM)
         except Exception:
             pass
+
+
+def test_generated_html_embeds_lexend_deca_light_offline(tmp_path):
+    """Mọi trang engine sinh ra dùng font mặc định Lexend Deca Light, NHÚNG base64 — mở file:// không mạng vẫn đúng font."""
+    gid = setup(tmp_path)
+    r = subprocess.run([sys.executable, str(ROOT / "engine/graph-viz.py"), str(tmp_path / f"{gid}.graph.json")], capture_output=True, text=True, cwd=ROOT)
+    assert r.returncode == 0, r.stderr
+    r = subprocess.run([sys.executable, str(ROOT / "engine/graph-atlas.py"), str(tmp_path)], capture_output=True, text=True, cwd=ROOT)
+    assert r.returncode == 0, r.stderr
+    for page in (tmp_path / f"{gid}.graph.html", tmp_path / "atlas.html"):
+        h = page.read_text(encoding="utf-8")
+        assert h.count('id="ovs-font"') == 1 and "font-family:'Lexend Deca'" in h and "data:font/woff2;base64," in h, page
+        assert "--fw-text:300" in h and "fonts.googleapis.com" not in h
+    assert subprocess.run([sys.executable, str(ROOT / "engine/html_font.py"), "--check"], capture_output=True).returncode == 0

@@ -33,6 +33,17 @@ KIND_LOCAL_PATH = Path(os.environ.get("ORCA_GRAPH_HOME") or Path.home() / ".orca
 _FALLBACK_REGISTRY = {"build": {"icon": "🔧", "shape": "circle", "color": "#3b82f6"}}  # phòng khi thiếu file
 
 
+def ovs_font(html_doc: str) -> str:
+    """Font mặc định cho mọi trang engine sinh ra = Lexend Deca Light, NHÚNG base64 (offline vẫn đúng font).
+    html_font.py nằm cạnh engine THẬT (`_ENGINE_DIR` — dưới shim `__file__` là đường shim nên không dùng with_name)."""
+    import importlib.util
+    for c in (_ENGINE_DIR / "html_font.py", Path.home() / ".claude/harness/fdk/tools/html_font.py"):
+        if c.is_file():
+            s = importlib.util.spec_from_file_location("og_html_font", c); m = importlib.util.module_from_spec(s); s.loader.exec_module(m)
+            return m.apply(html_doc)
+    return html_doc
+
+
 def load_kind_registry() -> dict:
     """Nguồn vĩnh viễn (engine/kind-glyphs.json) + kind mới đã tự sinh trước đó
     (kind-glyphs.local.json) — cùng một `kind` thì file local đè để không sinh lại mỗi lần chạy."""
@@ -259,7 +270,7 @@ def page(title: str, nav_html: str, main_html: str, out: Path, pagekey: str, des
 <footer>Sinh bởi <code>fdk/tools/{Path(__file__).name}</code> · {time.strftime("%Y-%m-%d %H:%M")} · file này nằm tại:<br><code class="path">{html.escape(str(out.resolve()))}</code></footer>
 </main><script>{JS.replace("PAGEKEY", pagekey)}</script></body></html>"""
     out.parent.mkdir(parents=True, exist_ok=True)
-    out.write_text(doc, encoding="utf-8")
+    out.write_text(ovs_font(doc), encoding="utf-8")
 
 
 # ---------- trang 1 graph ----------

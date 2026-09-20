@@ -1,5 +1,14 @@
 # Changelog
 
+## 3.0.3 — 2026-09-20
+
+### Changed
+- Mọi trang HTML engine sinh ra (graph, atlas) dùng font mặc định **Lexend Deca Light** (weight 300 cho nội dung, trục 300–700 cho chữ đậm/tiêu đề), NHÚNG base64 (~49 KB/trang, subset latin + tiếng Việt) — mở `file://` không mạng vẫn đúng font, không gọi Google Fonts. `engine/html_font.py` + `html_font_data.py` là BẢN SAO từ `Rheinmir/setup` (`fdk/tools/`), giấy phép SIL OFL ở `engine/LexendDeca-NOTICE.txt`.
+- Khai `repo_role: module` trong `.overstack.yaml` cho `/ship` của overstack.
+
+### Fixed
+- Gỡ 3 trang control-room bị commit nhầm từ 3.0.0 (do test sinh ra khi chưa có `ORCA_GRAPH_NO_ROOM`).
+
 ## 3.0.2 — 2026-09-20
 
 ### Fixed
