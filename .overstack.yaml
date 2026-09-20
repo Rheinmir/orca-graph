@@ -1,0 +1,4 @@
+# Nhãn loại repo — /ship của overstack ĐỌC nhãn này để đi đúng luồng (xem AGENTS.md mục "Quy trình sau khi sửa").
+repo_role: module
+# module = repo vệ tinh do ta sở hữu, framework kéo về. Sau khi tag ở đây phải ghim lại commit/version ở framework:
+upstream_pin: {repo: Rheinmir/setup, branch: orca, file: fdk/skills.provenance.json, key: skills.orca-graph}

@@ -24,6 +24,7 @@
 - Mỗi hành vi mới: 1 test pytest; nếu ứng với một VT thì tên test chứa `VTnn` và cập nhật `evals/vt-matrix.json`. Không nhận vơ: chưa đủ thì `partial`/`out_of_scope` kèm lý do.
 
 ## Quy trình sau khi sửa
+Repo này khai `repo_role: module` trong `.overstack.yaml` — `/ship` của overstack đọc nhãn đó và đi đúng luồng dưới đây (không chạy `ci-local`/`capability-stamp`, là việc của repo framework).
 1. `python3 -m pytest -q tests && python3 evals/run.py && bash tests/install-test.sh` — **commit trước** khi chạy install-test (nó clone từ HEAD).
 2. Bump `VERSION` + hằng `VERSION` trong engine + `CHANGELOG.md` → push → tag `vX.Y.Z`.
 3. Bên overstack, chỉ khi cần: SKILL đổi → copy sang `skills/orca-graph/SKILL.md` → `python3 harness/scripts/sync-skills.py`; ghim lại `commit`/`version` trong `fdk/skills.provenance.json`; máy khách cần nhận thay đổi shim/installer → `python3 harness/scripts/capability-stamp.py --update`.
