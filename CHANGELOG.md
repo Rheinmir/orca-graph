@@ -1,5 +1,10 @@
 # Changelog
 
+## 3.0.1 — 2026-09-20
+
+### Fixed
+- Store tự ghi `.gitignore` (`.admission.lock*`, `*.locks/`) ở lần `lock`/`add-node` đầu tiên nếu chưa có — file khoá runtime không còn làm bẩn cây git của dự án chứa store. Store đã có `.gitignore` riêng thì không bị đụng.
+
 ## 3.0.0 — 2026-09-20
 
 Tách khỏi `Rheinmir/setup` (commit gốc `70ecb22`) thành repo riêng. Áp phần nằm trong tầm tool file-based của Reprise Graph Engine PRD v1.1 (§22–30).

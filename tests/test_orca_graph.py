@@ -875,3 +875,11 @@ def test_VT10_review_T2_reconcile_items_never_drops_error_rows_or_defaults_to_co
     assert r.returncode == 2 and "VERDICTS_FILE_NOT_FOUND" in r.stdout
     r = run(tmp_path, "reconcile-items", "--verdicts", v)
     assert r.returncode == 2 and "EMPTY_MANIFEST" in r.stdout
+
+
+def test_store_ignores_its_own_runtime_lock_files(tmp_path):
+    gid = setup(tmp_path); assert run(tmp_path, "lock", gid, "t1").returncode == 0
+    gi = (tmp_path / ".gitignore").read_text()
+    assert ".admission.lock*" in gi and "*.locks/" in gi
+    (tmp_path / ".gitignore").write_text("của user\n"); run(tmp_path, "lock", gid, "t3")
+    assert (tmp_path / ".gitignore").read_text() == "của user\n"          # đã có thì KHÔNG đụng

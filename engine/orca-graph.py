@@ -35,7 +35,7 @@ from pathlib import Path
 SHELL = shutil.which("bash")
 
 SCHEMA = 1
-VERSION = "3.0.0"
+VERSION = "3.0.1"
 STATES = ["proposed", "ready", "locked", "dispatched", "done", "done_unverified",
           "done_user_reported", "failed", "unknown", "blocked"]
 TERMINAL_OK = {"done", "done_user_reported"}
@@ -901,6 +901,9 @@ def admission_mutex(d: Path, wait: float = 15.0):
     stale từ trước phá luôn khoá mới của A — đo 1/150 vòng với 6 process).
     shortcut: mutex toàn store, đổi sang khoá theo từng resource_key nếu nhiều agent lock dồn dập thấy chờ."""
     d.mkdir(parents=True, exist_ok=True)
+    gi = d / ".gitignore"                            # file khoá là RUNTIME — store thường nằm trong git của dự án, đừng làm bẩn cây
+    if not gi.exists():
+        gi.write_text("# orca-graph runtime — không track\n.admission.lock*\n*.locks/\n", encoding="utf-8")
     lp = d / ".admission.lock"; t0 = time.time()
     try:
         import fcntl
