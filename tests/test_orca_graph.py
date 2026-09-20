@@ -3,6 +3,9 @@ kill -9 giữa lúc ghi không hỏng sổ (Reprise PRD bất biến 6) · audit
 import importlib.util, json, os, signal, subprocess, sys, time
 from pathlib import Path
 
+import tempfile as _tf
+os.environ.setdefault("ORCA_GRAPH_HOME", _tf.mkdtemp(prefix="og-test-home-"))   # KHÔNG đụng ~/.orca-graph thật (registry, daemon.lock)
+os.environ.setdefault("ORCA_GRAPH_NO_DAEMON", "1")                              # test nào cần daemon thì tự bỏ biến này
 os.environ.setdefault("ORCA_GRAPH_NO_ROOM", "1")     # test engine độc lập: không gọi cockpit overstack của máy thật mỗi lần emit
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = ROOT / "engine/orca-graph.py"
@@ -883,3 +886,23 @@ def test_store_ignores_its_own_runtime_lock_files(tmp_path):
     assert ".admission.lock*" in gi and "*.locks/" in gi
     (tmp_path / ".gitignore").write_text("của user\n"); run(tmp_path, "lock", gid, "t3")
     assert (tmp_path / ".gitignore").read_text() == "của user\n"          # đã có thì KHÔNG đụng
+
+
+def test_manual_lock_registers_store_and_starts_the_watch_daemon(tmp_path):
+    """Hồi quy 200926 "control room chết trong âm thầm": dispatch GÕ TAY cũng phải có daemon canh, không chỉ `run`."""
+    gid = setup(tmp_path); home = tmp_path / "home"
+    env = {k: v for k, v in os.environ.items() if k != "ORCA_GRAPH_NO_DAEMON"}; env["ORCA_GRAPH_HOME"] = str(home)
+    r = subprocess.run([sys.executable, str(SCRIPT), "--dir", str(tmp_path), "lock", gid, "t1"], capture_output=True, text=True, cwd=ROOT, env=env)
+    assert r.returncode == 0, r.stderr
+    try:
+        assert str(tmp_path.resolve()) in json.loads((home / "registry.json").read_text())["dirs"]
+        for _ in range(50):
+            if (home / "daemon.lock").exists():
+                break
+            time.sleep(0.1)
+        pid = int((home / "daemon.lock").read_text()); os.kill(pid, 0)                # daemon SỐNG
+    finally:
+        try:
+            os.kill(int((home / "daemon.lock").read_text()), signal.SIGTERM)
+        except Exception:
+            pass

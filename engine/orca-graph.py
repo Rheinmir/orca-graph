@@ -35,7 +35,7 @@ from pathlib import Path
 SHELL = shutil.which("bash")
 
 SCHEMA = 1
-VERSION = "3.0.1"
+VERSION = "3.0.2"
 STATES = ["proposed", "ready", "locked", "dispatched", "done", "done_unverified",
           "done_user_reported", "failed", "unknown", "blocked"]
 TERMINAL_OK = {"done", "done_user_reported"}
@@ -869,6 +869,11 @@ def emit(st: Store, g: dict, nid: str, to: str, by="", note="", op_key="", gen=N
     append_jsonl(st.events_p, ev)
     st.save(fold(g, read_jsonl(st.events_p), st.d))
     print(f"{nid}: {frm} → {to} (gen {new_gen}, rev {rev0+1})")
+    if to in ("locked", "dispatched"):
+        # Luồng GÕ TAY lock → set dispatched (luồng chính của SKILL) trước đây không đăng ký store và không bật daemon — chỉ `run`
+        # làm việc đó. Hệ quả đo 200926: cả một phiên 12 node không ai canh lease, control-room chỉ vẽ lại khi state đổi rồi
+        # đứng im. Node bắt đầu chạy bằng đường nào thì cũng phải có người canh.
+        registry_add(st.d); spawn_daemon()
     regen_room()
     return True
 

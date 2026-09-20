@@ -1,5 +1,10 @@
 # Changelog
 
+## 3.0.2 — 2026-09-20
+
+### Fixed
+- Luồng gõ tay `lock` → `set dispatched` nay cũng đăng ký store vào registry và bật daemon `watch` như `run`. Trước đây chỉ `run` làm việc đó, nên dispatch thủ công không có ai canh lease và control-room đứng im sau lần đổi state cuối.
+
 ## 3.0.1 — 2026-09-20
 
 ### Fixed
