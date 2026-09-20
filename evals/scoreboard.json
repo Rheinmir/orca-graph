@@ -1,0 +1,253 @@
+{
+ "ts": "2026-09-20T09:56:06+0700",
+ "engine_sha256": "66c9ebb5441b6990",
+ "total": 28,
+ "covered": 14,
+ "partial": 1,
+ "out_of_scope": 13,
+ "passed": 15,
+ "failed": [],
+ "matrix_problems": [],
+ "rows": [
+  {
+   "id": "VT-01",
+   "behavior": "Ordering chỉ do prompt → edge audit đề xuất bỏ, không đổi contract",
+   "status": "covered",
+   "tests": [
+    "test_VT01_edge_audit_proposes_removing_prompt_order_only"
+   ],
+   "result": "pass"
+  },
+  {
+   "id": "VT-02",
+   "behavior": "Approval không có payload artifact → giữ control/acceptance gate",
+   "status": "covered",
+   "tests": [
+    "test_VT02_edge_audit_keeps_control_gate_without_payload"
+   ],
+   "result": "pass"
+  },
+  {
+   "id": "VT-03",
+   "behavior": "Shared API quota → resource queue, không admission vô hạn",
+   "status": "covered",
+   "tests": [
+    "test_VT03_resource_shared_quota_queues_the_excess"
+   ],
+   "result": "pass"
+  },
+  {
+   "id": "VT-04",
+   "behavior": "Worktree riêng, migration namespace chung → claim serialize đúng",
+   "status": "covered",
+   "tests": [
+    "test_VT04_resource_exclusive_serializes_independent_worktrees"
+   ],
+   "result": "pass"
+  },
+  {
+   "id": "VT-05",
+   "behavior": "Item B sẵn sàng trước A → B downstream chạy trước khi A xong",
+   "status": "covered",
+   "tests": [
+    "test_VT05_VT06_wave_is_not_a_barrier_but_full_set_join_waits"
+   ],
+   "result": "pass"
+  },
+  {
+   "id": "VT-06",
+   "behavior": "Global ranking cần full set → chờ đủ tập, không áp item_local sai",
+   "status": "covered",
+   "tests": [
+    "test_VT05_VT06_wave_is_not_a_barrier_but_full_set_join_waits"
+   ],
+   "result": "pass"
+  },
+  {
+   "id": "VT-07",
+   "behavior": "Queue đầy trong fan-out → backpressure/drain, không drop hay deadlock",
+   "status": "out_of_scope",
+   "reason": "cần ledger giao dịch + scheduler bền (outbox/queue) — ngoài tầm tool file-based một máy (ADR-018)",
+   "tests": [],
+   "result": "n/a"
+  },
+  {
+   "id": "VT-08",
+   "behavior": "Producer crash sau output commit → recover downstream intent từ ledger/outbox",
+   "status": "out_of_scope",
+   "reason": "không có outbox; phần gần nhất là events.jsonl sống qua kill -9 (test_kill9_mid_write_keeps_ledger) — không đủ để nhận là covered",
+   "tests": [],
+   "result": "n/a"
+  },
+  {
+   "id": "VT-09",
+   "behavior": "Duplicate item giữ count bằng expected → so định danh phát hiện thiếu ID",
+   "status": "covered",
+   "tests": [
+    "test_VT09_duplicate_item_with_matching_count_is_not_complete"
+   ],
+   "result": "pass"
+  },
+  {
+   "id": "VT-10",
+   "behavior": "Null worker response → outcome thiếu/lỗi có ID, không bị filter mất",
+   "status": "covered",
+   "tests": [
+    "test_VT10_null_worker_response_stays_a_typed_missing_outcome"
+   ],
+   "result": "pass"
+  },
+  {
+   "id": "VT-11",
+   "behavior": "Summary vượt token cap → bounded split hoặc partial/block rõ",
+   "status": "out_of_scope",
+   "reason": "không có layered fan-in theo token (§24.6); orca-graph không gọi model tổng hợp",
+   "tests": [],
+   "result": "n/a"
+  },
+  {
+   "id": "VT-12",
+   "behavior": "Summary bỏ contradiction → fidelity gate fail",
+   "status": "out_of_scope",
+   "reason": "như VT-11 — không có tầng summary",
+   "tests": [],
+   "result": "n/a"
+  },
+  {
+   "id": "VT-13",
+   "behavior": "Worker transcript có canary → verifier packet không nhận canary",
+   "status": "out_of_scope",
+   "reason": "QC chạy lệnh shell độc lập, không dựng verifier packet/context cho model; cần executor adapter",
+   "tests": [],
+   "result": "n/a"
+  },
+  {
+   "id": "VT-14",
+   "behavior": "Reviewer cùng nguồn sai → nhiều vote không thành nhiều anchor độc lập",
+   "status": "out_of_scope",
+   "reason": "không có anchor registry / lineage nguồn (§25.3)",
+   "tests": [],
+   "result": "n/a"
+  },
+  {
+   "id": "VT-15",
+   "behavior": "Test fail nhưng model votes pass → critical gate vẫn fail",
+   "status": "covered",
+   "tests": [
+    "test_VT15_failed_check_beats_a_claimed_pass"
+   ],
+   "result": "pass"
+  },
+  {
+   "id": "VT-16",
+   "behavior": "Candidate sửa test làm yếu oracle → frozen-policy phát hiện",
+   "status": "out_of_scope",
+   "reason": "chỉ có cơ chế kề: verify/qc nằm trong spec_hash và `run --strict` revert file ghi ngoài `files`; chưa có baseline oracle đóng băng",
+   "tests": [],
+   "result": "n/a"
+  },
+  {
+   "id": "VT-17",
+   "behavior": "Verdict order khác finding order → mapping theo ID chính xác",
+   "status": "covered",
+   "tests": [
+    "test_VT17_verdict_order_differs_from_finding_order"
+   ],
+   "result": "pass"
+  },
+  {
+   "id": "VT-18",
+   "behavior": "Rejected finding xuất hiện lại → seen dedup, không thành new_count",
+   "status": "out_of_scope",
+   "reason": "chưa có seen ledger cho discovery (§26.2); mới có hàm dry-streak thuần",
+   "tests": [],
+   "result": "n/a"
+  },
+  {
+   "id": "VT-19",
+   "behavior": "Finder error trả empty → round incomplete, dry streak reset",
+   "status": "covered",
+   "tests": [
+    "test_VT19_finder_error_round_resets_dry_streak"
+   ],
+   "result": "pass"
+  },
+  {
+   "id": "VT-20",
+   "behavior": "Source revision thay đổi → reevaluation có version",
+   "status": "out_of_scope",
+   "reason": "như VT-18 — cần seen ledger có revision",
+   "tests": [],
+   "result": "n/a"
+  },
+  {
+   "id": "VT-21",
+   "behavior": "Cap reached đồng thời dry streak đạt → primary reason là cap",
+   "status": "out_of_scope",
+   "reason": "chưa có discovery controller với terminal precedence (§26.3)",
+   "tests": [],
+   "result": "n/a"
+  },
+  {
+   "id": "VT-22",
+   "behavior": "Model fallback rộng data exposure → block ngoài policy/grant",
+   "status": "out_of_scope",
+   "reason": "orca-graph không chọn model; routing thuộc executor (§27.1)",
+   "tests": [],
+   "result": "n/a"
+  },
+  {
+   "id": "VT-23",
+   "behavior": "20 inputs, nhiều reviewer stage → cost envelope đếm mọi call/attempt",
+   "status": "covered",
+   "tests": [
+    "test_VT23_cost_envelope_counts_every_call_not_agents"
+   ],
+   "result": "pass"
+  },
+  {
+   "id": "VT-24",
+   "behavior": "Scale ngoài supported host envelope → proposal blocked trước dispatch",
+   "status": "out_of_scope",
+   "reason": "chưa có scale proposal (§27.4); chỉ có trần cứng max_parallel và ≤20 node/graph",
+   "tests": [],
+   "result": "n/a"
+  },
+  {
+   "id": "VT-25",
+   "behavior": "Template core gate bị delta bỏ qua → conformance fail",
+   "status": "out_of_scope",
+   "reason": "pattern pack GP-01…04 chưa làm; SWH reuse layer ở repo setup lo phần template skill",
+   "tests": [],
+   "result": "n/a"
+  },
+  {
+   "id": "VT-26",
+   "behavior": "Candidate đổi hash → biên lai nhánh không tự pass gate tích hợp",
+   "status": "partial",
+   "reason": "chỉ phủ phần analog: hợp đồng node đổi sau khi xong → fresh=stale; không có integration queue/candidate hash",
+   "tests": [
+    "test_VT26_VT27_stale_results_never_join_the_new_plan"
+   ],
+   "result": "pass"
+  },
+  {
+   "id": "VT-27",
+   "behavior": "Cancel/replan giữa item stages → output muộn/stale không vào plan mới",
+   "status": "covered",
+   "tests": [
+    "test_VT26_VT27_stale_results_never_join_the_new_plan"
+   ],
+   "result": "pass"
+  },
+  {
+   "id": "VT-28",
+   "behavior": "Sampling 20 của universe 100 → báo đúng sample coverage",
+   "status": "covered",
+   "tests": [
+    "test_VT28_sample_coverage_is_not_full_audit"
+   ],
+   "result": "pass"
+  }
+ ]
+}
