@@ -44,6 +44,19 @@ def ovs_font(html_doc: str) -> str:
     return html_doc
 
 
+def ink_on(hex_color: str) -> str:
+    """Màu chữ đọc được trên một mảng màu: mực đậm hay trắng, cái nào tương phản cao hơn (WCAG). Dùng cho huy hiệu trạng thái."""
+    h = hex_color.lstrip("#"); h = "".join(c * 2 for c in h[:3]) if len(h) == 3 else h[:6]
+    lin = lambda v: v / 12.92 if v <= 0.03928 else ((v + 0.055) / 1.055) ** 2.4
+    L = sum(w * lin(int(h[i:i + 2], 16) / 255) for w, i in ((0.2126, 0), (0.7152, 2), (0.0722, 4)))
+    return "#0f0f12" if (L + 0.05) / 0.0555 >= 1.05 / (L + 0.05) else "#ffffff"
+
+
+def state_badge_style(state: str) -> str:
+    c = STATE_COLOR.get(state, "#64748b")
+    return f"background:{c};color:{ink_on(c)}"
+
+
 def load_kind_registry() -> dict:
     """Nguồn vĩnh viễn (engine/kind-glyphs.json) + kind mới đã tự sinh trước đó
     (kind-glyphs.local.json) — cùng một `kind` thì file local đè để không sinh lại mỗi lần chạy."""
@@ -145,7 +158,7 @@ def svg(g: dict, pos: dict, scale: float = 1.0, mini: bool = False, registry: di
 # ---------- theme (docs-site-macos) — MỘT danh sách rule dark, emit 2 khối ----------
 _DARK_RULES = [
     ("html{PFX}", "--bg:#0c0f16;--glass1:rgba(22,28,40,.55);--glass2:rgba(24,30,44,.72);--glass3:rgba(20,26,38,.9);"
-                  "--t1:#e6e9f0;--t2:#a2a9b8;--border:rgba(120,160,230,.16);--edge:#8fb3ff;--accent:#5ea2ff;--orb1:#1a3a6a;--orb2:#2a1a5a"),
+                  "--t1:#e6e9f0;--t2:#c8cfdc;--border:rgba(120,160,230,.16);--edge:#8fb3ff;--accent:#5ea2ff;--accent-ink:#a9d0ff;--orb1:#1a3a6a;--orb2:#2a1a5a"),
     ("html{PFX} body", "background:radial-gradient(1200px 700px at 8% -10%,var(--orb1),transparent 60%),radial-gradient(900px 600px at 100% 100%,var(--orb2),transparent 60%),var(--bg)"),
 ]
 
@@ -158,7 +171,7 @@ def _dark_css() -> str:
 
 CSS = """
 :root{--bg:#eaf2fd;--glass1:rgba(255,255,255,.55);--glass2:rgba(255,255,255,.7);--glass3:rgba(255,255,255,.88);
- --t1:#0f0f12;--t2:#4a4a55;--border:rgba(30,90,170,.14);--edge:#3b6fb6;--accent:#0a84ff;--orb1:#bcd6ff;--orb2:#dcc9ff;
+ --t1:#0f0f12;--t2:#454a57;--border:rgba(30,90,170,.14);--edge:#3b6fb6;--accent:#0a84ff;--accent-ink:#0059b8;--orb1:#bcd6ff;--orb2:#dcc9ff;
  --nav-w:260px;--nav-pad-y:18px;--r:16px}
 *{box-sizing:border-box}html{color-scheme:light dark}[hidden]{display:none!important}
 body{margin:0;font:13.5px/1.55 -apple-system,BlinkMacSystemFont,"SF Pro Text",Inter,system-ui,sans-serif;color:var(--t1);
@@ -173,8 +186,8 @@ html:not([data-theme=light]) nav,html[data-theme=dark] nav{background:linear-gra
 @media (prefers-color-scheme: light){html:not([data-theme=dark]) nav{background:linear-gradient(180deg,rgba(255,255,255,.62),rgba(255,255,255,.38) 55%,rgba(255,255,255,.5))}}
 body.nav-collapsed nav{transform:translateX(-100%)}
 nav .brand{font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--t2);padding:0 18px 10px}
-nav a{display:block;padding:7px 18px;font-size:12px;color:var(--t1);text-decoration:none;border-left:2px solid transparent}
-nav a:hover{background:var(--glass1);border-left-color:var(--accent)}
+nav a{display:block;padding:7px 18px;font-size:12px;color:var(--t1);text-decoration:none}
+nav a:hover{background:var(--glass1);color:var(--accent-ink)}
 nav .grp{font-size:10.5px;color:var(--t2);padding:12px 18px 4px;text-transform:uppercase;letter-spacing:.06em}
 .nav-close{position:absolute;top:10px;right:10px;width:26px;height:26px;border:0;border-radius:8px;background:var(--glass1);color:var(--t2);cursor:pointer}
 .nav-toggle{position:fixed;top:12px;left:12px;width:32px;height:32px;border:1px solid var(--border);border-radius:10px;background:var(--glass1);backdrop-filter:blur(14px);cursor:pointer;z-index:6;transition:opacity .2s}
@@ -188,7 +201,7 @@ body:not(.nav-collapsed) .nav-toggle{opacity:0;pointer-events:none}
 main{max-width:1180px;margin:0 auto;padding:28px 28px 60px}
 h1{font-size:22px;margin:6px 0 4px;letter-spacing:-.01em}h2{font-size:15px;margin:30px 0 10px}.sub{color:var(--t2);font-size:12.5px}
 .chips{display:flex;flex-wrap:wrap;gap:8px;margin:14px 0}.chip{padding:4px 10px;border-radius:999px;font-size:11px;background:var(--glass2);border:1px solid var(--border)}
-.chip b{color:var(--accent)}
+.chip b{color:var(--accent-ink)}
 .card,.diagram-box{background:var(--glass2);backdrop-filter:blur(18px) saturate(1.1);border:1px solid var(--border);border-radius:var(--r);
  box-shadow:inset 0 1px 0 rgba(255,255,255,.55),0 8px 30px rgba(20,60,120,.08);padding:14px 16px}
 .diagram-box{padding:0;overflow:hidden;position:relative;height:min(62vh,560px)}
@@ -208,7 +221,7 @@ table{width:100%;border-collapse:collapse;font-size:12.5px;background:var(--glas
 th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--border);vertical-align:top}th{font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;color:var(--t2)}
 tr:last-child td{border-bottom:0}code,.path{font:11.5px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;background:var(--glass1);padding:1px 5px;border-radius:5px}
 .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px}.node-card{scroll-margin-top:20px}.node-card h3{margin:0 0 4px;font-size:13px}
-.node-card .st{font-size:10.5px;padding:2px 8px;border-radius:999px;color:#fff;margin-left:6px;vertical-align:1px}
+.node-card .st,.st-badge{font-size:10.5px;padding:2px 8px;border-radius:999px;margin-left:6px;vertical-align:1px}
 .node-card ul{margin:6px 0 0;padding-left:16px;font-size:12px;color:var(--t2)}.node-card li b{color:var(--t1)}
 .gloss dt{font-weight:600;font-size:12.5px;margin-top:8px}.gloss dd{margin:2px 0 0;font-size:12px;color:var(--t2)}
 footer{margin-top:40px;color:var(--t2);font-size:11px}footer .path{display:inline-block;margin-top:6px;user-select:all}
@@ -319,7 +332,7 @@ def render_graph(gp: Path, out: Path, answers: list, png: str = "") -> None:
     card_body = {}
     for i, n in nodes.items():
         col = STATE_COLOR.get(n.get("state", "proposed"))
-        card_body[i] = f'''<h3>{i} — {html.escape(n["title"])}<span class="st" style="background:{col}">{html.escape(STATE_VI.get(n.get("state",""), ""))}</span></h3>
+        card_body[i] = f'''<h3>{i} — {html.escape(n["title"])}<span class="st" style="{state_badge_style(n.get("state","proposed"))}">{html.escape(STATE_VI.get(n.get("state",""), ""))}</span></h3>
 <ul><li><b>Cần xong trước</b> (deps): {", ".join(f"<code>{html.escape(d)}</code>" + (f" <i>({html.escape(r)})</i>" if (r := (n.get("dep_reasons") or {}).get(d)) else "") for d in n["deps"]) or "— (gốc)"} <span class="badge">{n.get("deps_conf","")}</span></li>
 <li><b>Mở khoá cho</b>: {", ".join(f"<code>{d}</code>" for d in down[i]) or "— (lá)"}</li>
 <li><b>Kiểu / chế độ</b>: {html.escape(n.get("kind",""))} / {"cần người (HITL)" if n.get("mode")=="hitl" else "agent tự chạy (AFK)"}</li>

@@ -920,3 +920,17 @@ def test_generated_html_embeds_lexend_deca_light_offline(tmp_path):
         assert h.count('id="ovs-font"') == 1 and "font-family:'Lexend Deca'" in h and "data:font/woff2;base64," in h, page
         assert "--fw-text:300" in h and "fonts.googleapis.com" not in h
     assert subprocess.run([sys.executable, str(ROOT / "engine/html_font.py"), "--check"], capture_output=True).returncode == 0
+
+
+def test_state_badge_text_meets_contrast_on_every_state_colour():
+    """Huy hiệu trạng thái từng để chữ TRẮNG trên cam/vàng/lục (2–3:1). ink_on() phải cho ≥ 4.5:1 với MỌI màu trạng thái."""
+    import importlib.util
+    s = importlib.util.spec_from_file_location("gv", ROOT / "engine/graph-viz.py"); gv = importlib.util.module_from_spec(s); s.loader.exec_module(gv)
+    lin = lambda v: v / 12.92 if v <= 0.03928 else ((v + 0.055) / 1.055) ** 2.4
+    L = lambda h: sum(w * lin(int(h.lstrip("#")[i:i + 2], 16) / 255) for w, i in ((0.2126, 0), (0.7152, 2), (0.0722, 4)))
+    for state, bg in gv.STATE_COLOR.items():
+        fg = gv.ink_on(bg); a, b = sorted((L(fg), L(bg)), reverse=True)
+        assert (a + 0.05) / (b + 0.05) >= 4.5, (state, bg, fg)
+        assert f"color:{fg}" in gv.state_badge_style(state)
+    css = gv.CSS
+    assert "border-left-color:var(--accent)" not in css and ".chip b{color:var(--accent-ink)}" in css

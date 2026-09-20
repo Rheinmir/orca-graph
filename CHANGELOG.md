@@ -1,5 +1,15 @@
 # Changelog
 
+## 3.1.0 — 2026-09-20
+
+Đợt "framework tự bắt slop của chính nó" (baseline đo cùng ngày: trang graph/control-room có chữ nhấn 3,5:1, huy hiệu trạng thái chữ trắng trên nền cam 2,75:1).
+
+### Changed
+- Trang sinh ra đi qua LỚP NỀN chung `html_base.py` (bản sao từ framework): font + token `--ovs-*` sáng/tối + tắt ligature trong code; trang đã có toggle riêng thì không bị chèn nút thứ hai.
+- Chữ nhấn dùng `--accent-ink` (#0059b8 sáng · #a9d0ff tối, ≥ 4,5:1) — `--accent` #0a84ff chỉ còn để tô mảng. Chữ phụ `--t2` đậm lên ở sáng, sáng lên ở tối.
+- Huy hiệu trạng thái: `ink_on()` chọn mực đậm hay trắng theo tương phản thật; `state_badge_style(state)` cho trang khác (control-room) dùng lại.
+- Bỏ sọc viền trái khi hover mục menu (side-stripe) — hover đổi nền + màu chữ.
+
 ## 3.0.4 — 2026-09-20
 
 ### Fixed
