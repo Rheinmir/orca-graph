@@ -1,5 +1,10 @@
 # Changelog
 
+## 3.0.4 — 2026-09-20
+
+### Fixed
+- `html_font.apply()` (bản sao từ framework): chỉ trỏ stack `-apple-system,…` về token khi nó nằm trong khối `<style>` của `<head>`. Bản 3.0.3 quét regex trên toàn trang nên có thể cắt đôi stack chứa `"Segoe UI"`, ăn mất nháy đóng của chuỗi JS, và đụng vào tài liệu con trong `srcdoc`. Nhận `</HEAD>` không phân biệt hoa thường; stack `monospace` không bị đụng.
+
 ## 3.0.3 — 2026-09-20
 
 ### Changed
