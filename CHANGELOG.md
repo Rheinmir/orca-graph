@@ -1,5 +1,10 @@
 # Changelog
 
+## 3.1.1 — 2026-09-20
+
+### Fixed
+- SVG đồ thị có `<title>` là phần tử con ĐẦU TIÊN (trước `<defs>`) — trước đây screen reader bỏ sót tên sơ đồ; cổng `frontend-antipattern` của framework báo WARN trên mọi trang graph.
+
 ## 3.1.0 — 2026-09-20
 
 Đợt "framework tự bắt slop của chính nó" (baseline đo cùng ngày: trang graph/control-room có chữ nhấn 3,5:1, huy hiệu trạng thái chữ trắng trên nền cam 2,75:1).

@@ -109,6 +109,7 @@ def svg(g: dict, pos: dict, scale: float = 1.0, mini: bool = False, registry: di
     padl = 12 + (IR + W * 1.6 + 8 if g.get("conflicts") else 0)   # chừa chỗ cho cung xung đột vồng ra trái
     out = [f'<svg class="graph" viewBox="-{padl:.0f} -12 {maxx+padl+12:.0f} {maxy+24}" width="{(maxx+padl+12)*scale:.0f}" height="{(maxy+24)*scale:.0f}" '
            f'xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Đồ thị phụ thuộc {html.escape(g["id"])}">',
+           f'<title>Đồ thị phụ thuộc {html.escape(g["id"])} — {len(nodes)} node</title>',   # <title> phải là CON ĐẦU của <svg> thì screen reader mới đọc
            '<defs><marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">'
            '<path d="M0 0L10 5L0 10z" fill="var(--edge)"/></marker></defs>']
     for i, n in nodes.items():
