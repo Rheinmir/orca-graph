@@ -18,8 +18,11 @@ tail -1 "$T/home/repo/engine/orca-graph.py" | grep -q "sửa tay" || die "instal
 FULL="$T/full/repo"; mkdir -p "$T/full"; git clone -q -b "$BR" "file://$SRC" "$FULL"
 git -C "$FULL" -c user.name=t -c user.email=t@t commit -q --allow-empty -m "LOCAL unpushed"
 OUT="$(ORCA_GRAPH_INSTALL_DIR="$FULL" bash "$ROOT/install.sh" --no-skill)"
-grep -q "CHƯA push" <<<"$OUT" && git -C "$FULL" log -1 --format=%s | grep -q "LOCAL unpushed" || die "commit chưa push bị mất: $OUT"
-[ "$(git -C "$FULL" rev-parse --is-shallow-repository)" = false ] || die "bản full bị ép thành shallow"; ok "commit chưa push được giữ, không bị shallow hoá"
+# checkout của CI là depth-1 → bản "full" ở đây cũng shallow và đi nhánh "commit local trên bản shallow"; cả hai nhánh đều phải GIỮ commit
+WAS_SHALLOW="$(git -C "$SRC" rev-parse --is-shallow-repository)"
+grep -Eq "CHƯA push|commit local trên bản shallow" <<<"$OUT" && git -C "$FULL" log -1 --format=%s | grep -q "LOCAL unpushed" || die "commit chưa push bị mất: $OUT"
+[ "$WAS_SHALLOW" = true ] || [ "$(git -C "$FULL" rev-parse --is-shallow-repository)" = false ] || die "bản full bị ép thành shallow"
+ok "commit chưa push được giữ, không bị shallow hoá (nguồn shallow: $WAS_SHALLOW)"
 # thư mục cài là SYMLINK tới bản dev → installer không đụng
 ln -s "$FULL" "$T/link-repo"; H0="$(git -C "$FULL" rev-parse HEAD)"
 OUT="$(ORCA_GRAPH_INSTALL_DIR="$T/link-repo" bash "$ROOT/install.sh" --no-skill)"
