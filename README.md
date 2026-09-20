@@ -39,6 +39,8 @@ Một task trong PLAN:
 **Verify:** `make test-migrations`
 ```
 
+`capacity:N` là **kích thước pool** của key: mỗi node đang giữ key (kể cả `shared`) chiếm một slot, các node khai N khác nhau thì lấy N nhỏ nhất. Dòng `**Depends:**` được parse nghiêm: token không resolve được (ghi chú chen vào, task không tồn tại) là lỗi build, không bị bỏ qua im lặng.
+
 Hướng dẫn đầy đủ cho agent nằm ở [`skills/orca-graph/SKILL.md`](skills/orca-graph/SKILL.md).
 
 ## Bản 3.0 có gì (theo Reprise Graph Engine PRD v1.1)
@@ -66,7 +68,7 @@ python3 evals/run.py                # ghi evals/scoreboard.json + nối một d�
 bash tests/install-test.sh          # cài thử từ chính checkout này
 ```
 
-Trạng thái bản 3.0.0: 14 kịch bản `covered`, 1 `partial`, 13 `out_of_scope`; 15/15 kịch bản trong phạm vi pass. `history.jsonl` giữ một dòng mỗi lần chạy kèm sha256 của engine, nên so được bản nào làm rớt kịch bản nào.
+Trạng thái bản 3.0.0: 13 kịch bản `covered`, 2 `partial`, 13 `out_of_scope`; 15/15 kịch bản trong phạm vi pass. `history.jsonl` giữ một dòng mỗi lần chạy kèm sha256 của engine, nên so được bản nào làm rớt kịch bản nào.
 
 ## Ngoài phạm vi (nói thẳng)
 

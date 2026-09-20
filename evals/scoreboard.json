@@ -1,9 +1,9 @@
 {
- "ts": "2026-09-20T09:56:06+0700",
- "engine_sha256": "66c9ebb5441b6990",
+ "ts": "2026-09-20T10:10:31+0700",
+ "engine_sha256": "7e2f975fa16b432b",
  "total": 28,
- "covered": 14,
- "partial": 1,
+ "covered": 13,
+ "partial": 2,
  "out_of_scope": 13,
  "passed": 15,
  "failed": [],
@@ -14,7 +14,8 @@
    "behavior": "Ordering chỉ do prompt → edge audit đề xuất bỏ, không đổi contract",
    "status": "covered",
    "tests": [
-    "test_VT01_edge_audit_proposes_removing_prompt_order_only"
+    "test_VT01_edge_audit_proposes_removing_prompt_order_only",
+    "test_VT01_review_V5_audit_keeps_preference_edge_when_downstream_uses_upstream_output"
    ],
    "result": "pass"
   },
@@ -32,7 +33,8 @@
    "behavior": "Shared API quota → resource queue, không admission vô hạn",
    "status": "covered",
    "tests": [
-    "test_VT03_resource_shared_quota_queues_the_excess"
+    "test_VT03_resource_shared_quota_queues_the_excess",
+    "test_VT03_review_V4_capacity_is_a_pool_size_not_order_dependent"
    ],
    "result": "pass"
   },
@@ -57,7 +59,8 @@
   {
    "id": "VT-06",
    "behavior": "Global ranking cần full set → chờ đủ tập, không áp item_local sai",
-   "status": "covered",
+   "status": "partial",
+   "reason": "chỉ phủ join của DAG (node cần toàn tập chờ MỌI upstream); không có membership seal / sealed_batch của §24.2",
    "tests": [
     "test_VT05_VT06_wave_is_not_a_barrier_but_full_set_join_waits"
    ],
@@ -92,8 +95,10 @@
    "id": "VT-10",
    "behavior": "Null worker response → outcome thiếu/lỗi có ID, không bị filter mất",
    "status": "covered",
+   "note": "dòng JSON `null` trần (không có item_id) là lỗi giao thức MALFORMED_VERDICT — không có ID nào để giữ; test phủ verdict null / status≠ok có item_id",
    "tests": [
-    "test_VT10_null_worker_response_stays_a_typed_missing_outcome"
+    "test_VT10_null_worker_response_stays_a_typed_missing_outcome",
+    "test_VT10_review_T2_reconcile_items_never_drops_error_rows_or_defaults_to_complete"
    ],
    "result": "pass"
   },
@@ -235,8 +240,10 @@
    "id": "VT-27",
    "behavior": "Cancel/replan giữa item stages → output muộn/stale không vào plan mới",
    "status": "covered",
+   "note": "phủ cả hai đường: `set done --plan-version` và `run` khi replan xảy ra giữa lúc agent chạy",
    "tests": [
-    "test_VT26_VT27_stale_results_never_join_the_new_plan"
+    "test_VT26_VT27_stale_results_never_join_the_new_plan",
+    "test_VT27_review_C4_run_result_from_old_plan_is_stale_after_midrun_replan"
    ],
    "result": "pass"
   },

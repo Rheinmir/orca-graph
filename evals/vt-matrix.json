@@ -31,7 +31,8 @@
   {
    "id": "VT-06",
    "behavior": "Global ranking cần full set → chờ đủ tập, không áp item_local sai",
-   "status": "covered"
+   "status": "partial",
+   "reason": "chỉ phủ join của DAG (node cần toàn tập chờ MỌI upstream); không có membership seal / sealed_batch của §24.2"
   },
   {
    "id": "VT-07",
@@ -53,7 +54,8 @@
   {
    "id": "VT-10",
    "behavior": "Null worker response → outcome thiếu/lỗi có ID, không bị filter mất",
-   "status": "covered"
+   "status": "covered",
+   "note": "dòng JSON `null` trần (không có item_id) là lỗi giao thức MALFORMED_VERDICT — không có ID nào để giữ; test phủ verdict null / status≠ok có item_id"
   },
   {
    "id": "VT-11",
@@ -150,7 +152,8 @@
   {
    "id": "VT-27",
    "behavior": "Cancel/replan giữa item stages → output muộn/stale không vào plan mới",
-   "status": "covered"
+   "status": "covered",
+   "note": "phủ cả hai đường: `set done --plan-version` và `run` khi replan xảy ra giữa lúc agent chạy"
   },
   {
    "id": "VT-28",

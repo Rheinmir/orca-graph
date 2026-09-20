@@ -44,7 +44,10 @@ LABELS = {"chắc": 1.0, "gợi-ý": 0.5, "không-biết": 0.3}
 HARD_REASONS = ("data", "contract", "acceptance", "effect_order", "control")
 REASONS = HARD_REASONS + ("preference",)
 CLAIM_RE = re.compile(r"^(.+?)\s*(?:\(\s*(shared|exclusive|capacity)\s*(?::\s*(\d+))?\s*\))?$", re.I)
-DEP_REASON_RE = re.compile(r"^(.*?)\s*\(\s*([A-Za-z_]+)\s*\)$")
+DEP_REASON_RE = re.compile(r"^(.*?)\s*\(\s*([A-Za-z_-]+)\s*\)$")
+XDEP_RE = re.compile(r"^[\w.-]+/[A-Za-z0-9]+$")          # dep xuyên graph <gid>/<tid> — chặn token rác có dấu `/` (vd HTML) lọt vào graph
+KIND_RE = re.compile(r"^[\w-]{1,32}$")
+NO_DEPS = {"—", "-", "–", "none", "không", "n/a"}
 def _default_dir() -> Path:
     """Store mặc định: $ORCA_GRAPH_DIR → <overstack>/graph (máy khách .llmwiki/, repo framework llmwiki/; qua overstack_paths
     nếu chạy dưới overstack) → llmwiki/graph. Engine sống ở repo riêng Rheinmir/orca-graph; dưới overstack nó được gọi qua
@@ -253,20 +256,33 @@ def parse_plan(text: str) -> list:
         raw = t.pop("deps_raw", "")
         if raw:
             deps, reasons = [], {}
-            for tok in [x.strip() for x in raw.split(",") if x.strip() and x.strip() != "—"]:
+            for tok in [x.strip().strip("`").strip() for x in re.split(r"[,;]", raw)]:
+                if not tok or tok.lower() in NO_DEPS:
+                    continue
+                where = f"Task {t['num']}: Depends `{tok}`"
                 rm = DEP_REASON_RE.match(tok)        # `Task 1 (data)` — lý do cạnh, PRD v1.1 §23.2
                 reason = ""
                 if rm:
-                    tok, reason = rm.group(1).strip(), rm.group(2).lower().replace("scheduling_preference", "preference")
+                    tok, reason = rm.group(1).strip().strip("`"), normalize_reason(rm.group(2))
                     if reason not in REASONS:
-                        raise SystemExit(f"Task {t['num']}: reason_class lạ `{reason}` ở Depends — hợp lệ: {', '.join(REASONS)}")
+                        raise SystemExit(f"{where}: reason_class lạ `{reason}` — hợp lệ: {', '.join(REASONS)}")
                 if "/" in tok:                       # dep XUYÊN graph: <gid>/<tid> (PRD §3.2 milestone có địa chỉ đầy đủ)
+                    if not XDEP_RE.match(tok):
+                        raise SystemExit(f"{where}: dep xuyên graph phải dạng <graph-id>/<task-id>")
                     x = tok
                 else:
                     x = tid(re.sub(r"^Task\s*", "", tok))
-                    if x not in ids or x == t["num"]:
-                        continue
-                deps.append(x)
+                    # KHÔNG nuốt: token không resolve được (ghi chú chen vào, `và`, task không tồn tại) mà bỏ qua im lặng
+                    # thì cạnh biến mất, node thành ready sớm, audit-edges cũng không thấy vì cạnh không còn.
+                    if x not in ids:
+                        raise SystemExit(f"{where}: không resolve được — viết `Task N` hoặc `Task N (reason)`, ngăn bằng dấu phẩy; ghi chú để ở dòng khác")
+                    if x == t["num"]:
+                        raise SystemExit(f"{where}: task tự phụ thuộc chính nó")
+                if x in deps:
+                    if reason and reasons.get(x, reason) != reason:
+                        raise SystemExit(f"{where}: lặp lại với reason khác (`{reasons[x]}` ≠ `{reason}`) — một cạnh một lý do")
+                else:
+                    deps.append(x)
                 if reason:
                     reasons[x] = reason
             t["deps"] = deps
@@ -278,6 +294,9 @@ def parse_plan(text: str) -> list:
             t["deps"] = [x for x in sorted(dep) if x in ids and x != t["num"]]
             t["deps_conf"] = "gợi-ý" if t["deps"] else "chắc"
         t["mode"] = "hitl" if t["mode"].lower().startswith("hitl") else "afk"
+        t["kind"] = t["kind"].strip().lower()
+        if not KIND_RE.match(t["kind"]):
+            raise SystemExit(f"Task {t['num']}: **Kind:** `{t['kind'][:40]}` không hợp lệ — một từ [a-z0-9_-]")
         claims = parse_claims(t.pop("resources_raw", ""), f"Task {t['num']}")
         if claims:
             t["resources"] = claims
@@ -285,6 +304,10 @@ def parse_plan(text: str) -> list:
         for k in ("num", "produces_for"):
             t.pop(k, None)
     return tasks
+
+
+def normalize_reason(r: str) -> str:
+    return r.strip().lower().replace("-", "_").replace("scheduling_preference", "preference")
 
 
 def parse_claims(raw: str, where: str = "") -> list:
@@ -300,6 +323,8 @@ def parse_claims(raw: str, where: str = "") -> list:
         c = {"key": key, "mode": mode}
         if mode == "capacity":
             c["units"] = int(m.group(3))
+            if c["units"] < 1:
+                raise SystemExit(f"{where}: `{tok}` — capacity phải ≥ 1 (0 = node không bao giờ lock được)")
         out[key] = c
     return [out[k] for k in sorted(out)]
 
@@ -407,7 +432,7 @@ def untid(i: str) -> str:
 
 def render_task(num: str, a, deps: list) -> str:
     dep_s = ", ".join((f"Task {untid(d)}" if "/" not in d else d) + (f" ({r})" if r else "") for d, r in deps) or "—"
-    lines = [f"### Task {num}: {a.title.strip()}", f"**Kind:** {a.kind}", f"**Depends:** {dep_s}"]
+    lines = [f"### Task {num}: {a.title.strip()}", f"**Kind:** {a.kind.strip().lower()}", f"**Depends:** {dep_s}"]
     if a.mode == "hitl":
         lines.append("**Mode:** HITL")
     lines.append("**Files:**")
@@ -422,50 +447,89 @@ def render_task(num: str, a, deps: list) -> str:
     return "\n".join(lines) + "\n"
 
 
+def plan_struct(lines: list) -> list:
+    """[(idx, dòng)] của các dòng CẤU TRÚC — bỏ mọi thứ nằm trong code fence, đúng như parse_plan nhìn PLAN.
+    add-node phải thấy PLAN bằng đúng con mắt của parser; quét thô thì `### Task 9` hay `**Depends:**` làm MẪU trong fence
+    sẽ bị coi là thật (chèn sai chỗ, cấp sai id, sửa nhầm dòng trong fence)."""
+    out, fence = [], False
+    for i, ln in enumerate(lines):
+        if ln.strip().startswith("```"):
+            fence = not fence; continue
+        if not fence:
+            out.append((i, ln))
+    return out
+
+
 def cmd_add_node(a):
+    with admission_mutex(Path(a.dir)):          # đọc-sửa-ghi PLAN: 2 add-node song song không được đè mất task của nhau
+        _add_node(a)
+
+
+def _add_node(a):
     st = Store(Path(a.dir), a.id); g = st.load()
     plan = Path(g["plan"])
     if not plan.is_file():
         raise SystemExit(f"không thấy PLAN gốc `{plan}` (đường lưu lúc build, tính từ cwd khi đó) — cd về đúng gốc dự án rồi chạy lại")
-    if "\n" in a.title or not a.title.strip():
-        raise SystemExit("--title rỗng hoặc chứa xuống dòng")
+    for name in ("title", "depends", "blocks", "files", "verify", "qc", "kind", "produces", "resources"):
+        if re.search(r"[\r\n]", getattr(a, name) or ""):   # mỗi field là MỘT dòng PLAN — xuống dòng = chèn được `### Task`/`**Depends:**` giả
+            raise SystemExit(f"--{name} chứa xuống dòng — từ chối (mỗi field là một dòng trong PLAN)")
+    if not a.title.strip():
+        raise SystemExit("--title rỗng")
     text = plan.read_text(encoding="utf-8")
     ids = {n["id"] for n in g["nodes"]}
-    used = ids | {x["id"] for x in g.get("superseded", [])} | {tid(m) for m in re.findall(r"^### Task ([A-Za-z0-9]+)", text, re.M)}
+    if {x["id"] for x in parse_plan(text)} != ids:    # cwd khác có file trùng tên tương đối, hoặc PLAN đã sửa mà chưa build
+        raise SystemExit(f"PLAN `{plan}` không khớp graph {a.id} (task trong PLAN ≠ node trong graph) — `build` lại trước, hoặc cd về đúng gốc dự án")
+    lines = text.splitlines(keepends=True)
+    if lines and not lines[-1].endswith("\n"):
+        lines[-1] += "\n"
+    used = ids | {x["id"] for x in g.get("superseded", [])}
     num = str(max([int(i[1:]) for i in used if re.fullmatch(r"t\d+", i)] or [0]) + 1)      # không tái dùng id node đã bị bỏ
     deps = []
     for tok in [x.strip() for x in a.depends.split(",") if x.strip()]:
         d, _, r = tok.partition(":")
+        d = d.strip(); r = normalize_reason(r) if r.strip() else ""
         d = d if "/" in d else tid(re.sub(r"^Task\s*", "", d))
+        if "/" in d and not XDEP_RE.match(d):
+            raise SystemExit(f"--depends: `{d}` — dep xuyên graph phải dạng <graph-id>/<task-id>")
         if "/" not in d and d not in ids:
             raise SystemExit(f"--depends: không có node `{d}` trong {a.id} (có: {sorted(ids)})")
         if r and r not in REASONS:
             raise SystemExit(f"--depends: reason_class lạ `{r}` — hợp lệ: {', '.join(REASONS)}")
-        deps.append((d, r))
+        if d not in [x for x, _ in deps]:
+            deps.append((d, r))
     parse_claims(a.resources, "--resources")                                             # sai cú pháp thì chết TRƯỚC khi chạm PLAN
-    lines = text.splitlines(keepends=True)
-    blocks = [tid(re.sub(r"^Task\s*", "", x.strip())) for x in a.blocks.split(",") if x.strip()]
-    for b in blocks:                                                                      # node mới chèn TRƯỚC b: b phụ thuộc node mới
+    if not KIND_RE.match(a.kind.strip().lower()):
+        raise SystemExit(f"--kind `{a.kind}` không hợp lệ — một từ [a-z0-9_-]")
+    state = {n["id"]: n["state"] for n in g["nodes"]}
+    blocks = []
+    for b in [tid(re.sub(r"^Task\s*", "", x.strip())) for x in a.blocks.split(",") if x.strip()]:
         if b not in ids:
             raise SystemExit(f"--blocks: không có node `{b}`")
+        if state[b] in ("locked", "dispatched"):                                          # đổi hợp đồng của node ĐANG chạy = kết quả của nó thuộc spec cũ
+            raise SystemExit(f"--blocks: {b} đang {state[b]} — chờ nó xong (hoặc `control cancel`) rồi mới chèn việc vào trước nó")
+        if b not in blocks:
+            blocks.append(b)
+    for b in blocks:                                                                      # node mới chèn TRƯỚC b: b phụ thuộc node mới
         lines = _add_dep_line(lines, b, f"Task {num}")
-    last_task = max(i for i, ln in enumerate(lines) if TASK_RE.match(ln.strip()))
-    fence, at = False, len(lines)
-    for i in range(last_task + 1, len(lines)):                                            # chèn trước mục `## ` đầu tiên sau task cuối (vd ## Origin)
-        if lines[i].strip().startswith("```"):
-            fence = not fence
-        if not fence and lines[i].startswith("## "):
-            at = i; break
+    struct = plan_struct(lines)
+    last_task = max(i for i, ln in struct if TASK_RE.match(ln.strip()))
+    at = next((i for i, ln in struct if i > last_task and ln.startswith("## ")), len(lines))   # trước mục `## ` đầu tiên sau task cuối (vd ## Origin)
     block = render_task(num, a, deps)
     pre = "" if at == 0 or lines[at - 1].strip() == "" else "\n"
     new_text = "".join(lines[:at]) + pre + block + "\n" + "".join(lines[at:])
-    tasks = parse_plan(new_text)                                                          # KIỂM trước, ghi sau — bị từ chối thì PLAN nguyên vẹn
+    tasks = {x["id"]: x for x in parse_plan(new_text)}                                   # KIỂM trước, ghi sau — bị từ chối thì PLAN nguyên vẹn
+    nid = f"t{num}"
     if len(tasks) > 20:
         raise SystemExit(f"{len(tasks)} node > 20/graph (PRD §5.2) — tách graph con: build <PLAN con> --parent {a.id}/<node>")
-    toposort({t["id"]: t for t in tasks})
-    nid = f"t{num}"
-    if nid not in {t["id"] for t in tasks}:
-        raise SystemExit("PLAN sau khi chèn không parse ra node mới — dừng, không ghi")
+    toposort(tasks)
+    if set(tasks) != ids | {nid}:
+        raise SystemExit("PLAN sau khi chèn không ra đúng `node cũ + 1 node mới` — dừng, không ghi")
+    got = tasks[nid]
+    if got["deps"] != [d for d, _ in deps] or (a.verify.strip() and not got["verify"]) or got["files"] != [f.strip() for f in a.files.split(",") if f.strip()]:
+        raise SystemExit(f"node mới parse lại không khớp tham số (deps={got['deps']} verify={got['verify']!r} files={got['files']}) — dừng, không ghi")
+    miss = [b for b in blocks if nid not in tasks[b]["deps"]]
+    if miss:
+        raise SystemExit(f"--blocks: chèn xong mà {miss} vẫn không phụ thuộc {nid} — dừng, không ghi")
     atomic_write(plan, new_text)
     print(f"+ {nid} «{a.title.strip()}» → {plan}" + (f" · chèn trước {blocks}" if blocks else ""))
     par = g.get("parent")
@@ -478,15 +542,17 @@ def cmd_add_node(a):
 
 
 def _add_dep_line(lines: list, nid: str, ref: str) -> list:
-    """Thêm `ref` vào **Depends:** của task `nid`; task chưa có dòng Depends thì thêm ngay dưới tiêu đề."""
-    start = next(i for i, ln in enumerate(lines) if (m := TASK_RE.match(ln.strip())) and tid(m.group(1)) == nid)
-    end = next((i for i in range(start + 1, len(lines)) if TASK_RE.match(lines[i].strip()) or lines[i].startswith("## ")), len(lines))
-    for i in range(start + 1, end):
-        m = re.match(r"^(\*\*Depends:\*\*\s*)(.*?)(\s*)$", lines[i])
-        if m:
-            cur = m.group(2).strip()
-            lines[i] = f"{m.group(1)}{ref if cur in ('', '—') else cur + ', ' + ref}\n"
-            return lines
+    """Thêm `ref` vào **Depends:** của task `nid` (chỉ nhìn dòng CẤU TRÚC, ngoài code fence); chưa có dòng Depends thì thêm ngay dưới tiêu đề."""
+    struct = plan_struct(lines)
+    start = next(i for i, ln in struct if (m := TASK_RE.match(ln.strip())) and tid(m.group(1)) == nid)
+    end = next((i for i, ln in struct if i > start and (TASK_RE.match(ln.strip()) or ln.startswith("## "))), len(lines))
+    for i, ln in struct:
+        if start < i < end:
+            m = re.match(r"^(\*\*Depends:\*\*\s*)(.*?)(\s*)$", ln)
+            if m:
+                cur = m.group(2).strip()
+                lines[i] = f"{m.group(1)}{ref if cur.lower() in NO_DEPS | {''} else cur + ', ' + ref}\n"
+                return lines
     return lines[:start + 1] + [f"**Depends:** {ref}\n"] + lines[start + 1:]
 
 
@@ -601,6 +667,13 @@ def audit_edges(g: dict) -> dict:
                 else:
                     if any(tid(x) == dep for c in n.get("consumes", []) for x in TASK_REF.findall(c)):
                         hidden.append(f"Consumes của {n['id']} nhắc tới {dep} → thực ra là cạnh data")
+                    hay = " ".join(n.get("consumes", []) + [n.get("verify", ""), n.get("qc", "")])
+                    outs = set(up.get("files", [])) | {Path(f).name for f in up.get("files", [])}
+                    for pr in up.get("produces", []):
+                        outs |= {pr.strip()} | set(re.findall(r"`([^`]+)`", pr))
+                    used = sorted(o for o in outs if len(o.strip("—- ")) >= 4 and o in hay)
+                    if used:
+                        hidden.append(f"Consumes/Verify của {n['id']} dùng output của {dep}: {used[:3]} → thực ra là cạnh data")
                     shared = sorted(set(n.get("files", [])) & set(up.get("files", [])))
                     if shared:
                         hidden.append(f"cùng ghi {shared} → bỏ cạnh sẽ thành xung đột ghi")
@@ -802,7 +875,7 @@ def emit(st: Store, g: dict, nid: str, to: str, by="", note="", op_key="", gen=N
 
 def cmd_next(a):
     st = Store(Path(a.dir), a.id); g = st.load()
-    k = reaper(st, g)
+    k = reaper(st, g) + reap_store(st.d, skip=a.id)
     if k:
         g = st.load(); print(f"reaper: {k} node hết lease → unknown")
     if g.get("control", "active") != "active":
@@ -821,28 +894,57 @@ def cmd_next(a):
 
 
 @contextlib.contextmanager
-def admission_mutex(d: Path, wait: float = 15.0, stale: float = 60.0):
-    """Một mutex cho cả store trong lúc KIỂM + GHI `locked` — hai agent lock hai node cùng claim exclusive không lọt cùng lúc.
-    Lấy hết claim hoặc không lấy gì (không hold-and-wait, PRD v1.1 §23.4).
+def admission_mutex(d: Path, wait: float = 15.0):
+    """Một mutex cho cả store trong lúc KIỂM + GHI (`lock`: claim → `locked`; `add-node`: đọc-sửa-ghi PLAN).
+    Lấy hết claim hoặc không lấy gì (không hold-and-wait, PRD v1.1 §23.4). Dùng flock: kernel tự nhả khi process chết
+    nên KHÔNG có logic phá khoá stale (bản O_EXCL + mtime từng có TOCTOU: A phá khoá cũ rồi tạo khoá mới, B đã stat thấy
+    stale từ trước phá luôn khoá mới của A — đo 1/150 vòng với 6 process).
     shortcut: mutex toàn store, đổi sang khoá theo từng resource_key nếu nhiều agent lock dồn dập thấy chờ."""
     d.mkdir(parents=True, exist_ok=True)
     lp = d / ".admission.lock"; t0 = time.time()
+    try:
+        import fcntl
+    except ImportError:                              # Windows python thuần: không có flock → O_EXCL, chấp nhận phải xoá tay nếu crash
+        fcntl = None
+    if fcntl:
+        with open(lp, "a") as fh:
+            while True:
+                try:
+                    fcntl.flock(fh, fcntl.LOCK_EX | fcntl.LOCK_NB); break
+                except OSError:
+                    if time.time() - t0 > wait:
+                        raise SystemExit(f"admission bận quá {wait:.0f}s ({lp}) — có lệnh lock/add-node khác đang chạy; thử lại")
+                    time.sleep(0.05)
+            try:
+                yield
+            finally:
+                fcntl.flock(fh, fcntl.LOCK_UN)
+        return
     while True:
         try:
-            os.close(os.open(lp, os.O_CREAT | os.O_EXCL | os.O_WRONLY)); break
+            os.close(os.open(str(lp) + ".excl", os.O_CREAT | os.O_EXCL | os.O_WRONLY)); break
         except FileExistsError:
-            try:
-                if time.time() - lp.stat().st_mtime > stale:
-                    lp.unlink(missing_ok=True); continue          # chủ cũ chết giữa chừng
-            except FileNotFoundError:
-                continue
             if time.time() - t0 > wait:
-                raise SystemExit(f"admission bận quá {wait:.0f}s ({lp}) — thử lại")
+                raise SystemExit(f"admission bận quá {wait:.0f}s — nếu không còn lệnh nào chạy, xoá {lp}.excl")
             time.sleep(0.05)
     try:
         yield
     finally:
-        lp.unlink(missing_ok=True)
+        Path(str(lp) + ".excl").unlink(missing_ok=True)
+
+
+def reap_store(d: Path, skip: str = "") -> int:
+    """Reaper cho MỌI graph trong store — claim xuyên graph: lease hết ở graph A mà không ai `next A` thì B kẹt mãi."""
+    k = 0
+    for p in sorted(Path(d).glob("*.graph.json")):
+        gid = p.name[:-len(".graph.json")]
+        if gid == skip:
+            continue
+        try:
+            st = Store(Path(d), gid); k += reaper(st, st.load())
+        except SystemExit:
+            continue
+    return k
 
 
 def resource_blockers(g: dict, n: dict, d: Path) -> list:
@@ -864,10 +966,13 @@ def resource_blockers(g: dict, n: dict, d: Path) -> list:
     for c in mine:
         same = [(who, h) for who, h in holders if h["key"] == c["key"]]
         excl = [(who, h) for who, h in same if "exclusive" in (c["mode"], h["mode"])]
+        # capacity:N = KÍCH THƯỚC POOL của key. Mỗi holder (shared hay capacity) chiếm 1 slot; các node khai N khác nhau thì
+        # lấy N NHỎ NHẤT — không phụ thuộc thứ tự lock, và khai `shared` không lách được quota người khác đã khai.
+        caps = [h["units"] for _, h in same if h["mode"] == "capacity"] + ([c["units"]] if c["mode"] == "capacity" else [])
         if excl:
             out.append({"key": c["key"], "mode": c["mode"], "held_by": [w for w, _ in excl], "why": "exclusive"})
-        elif c["mode"] == "capacity" and len(same) >= c["units"]:
-            out.append({"key": c["key"], "mode": c["mode"], "held_by": [w for w, _ in same], "why": f"capacity {len(same)}/{c['units']} đầy"})
+        elif caps and len(same) >= min(caps):
+            out.append({"key": c["key"], "mode": c["mode"], "held_by": [w for w, _ in same], "why": f"capacity {len(same)}/{min(caps)} đầy"})
     return out
 
 
@@ -878,6 +983,8 @@ def cmd_lock(a):
 
 def _lock(a):
     st = Store(Path(a.dir), a.id); g = st.load()
+    if reaper(st, g) + reap_store(st.d, skip=a.id):
+        g = st.load()
     nodes = {n["id"]: n for n in g["nodes"]}
     n = nodes[a.node]
     if n["state"] not in ("ready", "unknown", "failed"):
@@ -910,6 +1017,11 @@ def cmd_unlock(a):
         lp.unlink(); print(f"unlock {a.node}")
     else:
         print("không có lock")
+    g = st.load()
+    n = {x["id"]: x for x in g["nodes"]}.get(a.node)
+    if n and n["state"] in ("locked", "dispatched"):     # gỡ khoá mà để nguyên state = node "đang chạy" mãi mãi, giữ luôn claim của nó
+        emit(st, g, a.node, "unknown", by=getattr(a, "by", "") or "unlock", note="unlock tay khi node đang chạy — reconcile trước khi lock lại",
+             op_key=f"unlock:{a.node}:{n['gen']}:{n['rev']}")
 
 
 def cmd_heartbeat(a):
@@ -1096,7 +1208,8 @@ def cmd_run(a):
     g = st.load()
     emit(st, g, a.node, "dispatched", by=a.by, note=" ".join(a.cmd)[:120], op_key=f"run:{a.node}:{int(time.time()*1000)}")
     registry_add(Path(a.dir)); spawn_daemon()
-    gen = {x["id"]: x for x in st.load()["nodes"]}[a.node]["gen"]
+    g0 = st.load()
+    gen = {x["id"]: x for x in g0["nodes"]}[a.node]["gen"]; pv = g0.get("plan_version", 1)
     lp = st.locks_d / a.node
     root = _git_root(Path.cwd())
     before = _changed_files(root) if root else {}
@@ -1114,7 +1227,12 @@ def cmd_run(a):
         if oos:
             tag = "strict: revert" if a.strict else "⚠ ngoài phạm vi (files)"
             note += f" | {tag} {len(oos)}: {','.join(oos[:5])}"
-    emit(st, g, a.node, to, by=a.by, note=note, op_key=f"run-end:{a.node}:{gen}", gen=gen)
+    ok = emit(st, g, a.node, to, by=a.by, note=note, op_key=f"run-end:{a.node}:{gen}", gen=gen, plan_version=pv if to == "done" else None)
+    if not ok and to == "done":      # replan xảy ra GIỮA lúc chạy: kết quả thuộc plan cũ, không publish (invariant 2) → làm lại theo spec mới
+        g = st.load()
+        if {x["id"]: x for x in g["nodes"]}.get(a.node, {}).get("state") == "dispatched":
+            emit(st, g, a.node, "ready", by=a.by, note=f"kết quả plan v{pv} bị loại sau replan — chạy lại", op_key=f"run-stale:{a.node}:{gen}")
+        to = "stale"
     cmd_unlock(a); registry_prune()
     sys.exit(0 if to == "done" else p.returncode or 1)
 
@@ -1123,6 +1241,8 @@ def regen_room() -> None:
     """Vẽ lại cockpit (rẻ ~100 ms) — gọi ở MỌI lần state đổi (emit) + mỗi lượt daemon/run để trang LIVE.
     stdout KHÔNG bị nuốt: build-control-room.py tự in 3 dòng `→ <path>` (cockpit/detail/kanban) —
     đó là cách duy nhất path lộ ra cho user, không dựa vào model tự nhớ."""
+    if os.environ.get("ORCA_GRAPH_NO_ROOM"):
+        return
     br = Path(__file__).resolve().parents[2] / "fdk/tools/build-control-room.py"
     if not br.exists():
         br = Path.home() / ".claude/harness/fdk/tools/build-control-room.py"
@@ -1308,15 +1428,26 @@ INFRA_OK = ("ok", None)
 def cmd_reconcile_items(a):
     """Manifest đã seal (expected IDs) × các dòng verdict → thiếu/thừa/trùng theo TẬP ĐỊNH DANH (PRD v1.1 §24.1).
     Dòng có status hạ tầng ≠ ok hoặc verdict null = outcome THIẾU có ID (errored_ids) — không bị lọc mất, không tính refuted."""
+    def fail(code):
+        print(json.dumps({"protocol_error": code}, ensure_ascii=False)); sys.exit(2)
     expected = [x.strip() for x in (Path(a.expected_file).read_text(encoding="utf-8").replace("\n", ",") if a.expected_file else a.expected).split(",") if x.strip()]
+    if not expected and not a.allow_empty:
+        fail("EMPTY_MANIFEST")           # "không có input" cần policy tường minh (--allow-empty); không tự suy ra "đủ hết"
+    if not Path(a.verdicts).is_file():
+        fail("VERDICTS_FILE_NOT_FOUND")  # thiếu file ≠ 0 dòng verdict
     rows = read_jsonl(Path(a.verdicts))
     is_err = lambda r: isinstance(r, dict) and (r.get("status") not in INFRA_OK or r.get("verdict") is None)
-    errored = [r.get("item_id") for r in rows if is_err(r)]
+    err_ids = [r.get("item_id") for r in rows if is_err(r)]
+    ok_ids = [r.get("item_id") for r in rows if isinstance(r, dict) and not is_err(r)]
+    if any(not isinstance(i, str) or i not in expected for i in err_ids):
+        fail("UNEXPECTED_ITEM_ID")       # dòng lỗi cũng phải thuộc manifest — ID lạ không được lặng lẽ bỏ qua
+    if set(err_ids) & set(ok_ids) or len(set(err_ids)) != len(err_ids):
+        fail("CONFLICTING_OUTCOME")      # cùng item vừa có verdict vừa có dòng lỗi (hoặc hai dòng lỗi) → không tự chọn bên nào
     try:
         out = reconcile_verdicts(expected, [r for r in rows if not is_err(r)])
     except ValueError as e:
-        print(json.dumps({"protocol_error": str(e)}, ensure_ascii=False)); sys.exit(2)
-    out["errored_ids"] = [x for x in out["missing_ids"] if x in errored]
+        fail(str(e))
+    out["errored_ids"] = [x for x in out["missing_ids"] if x in err_ids]
     out["counts"] = {"expected": len(expected), "received": len(expected) - len(out["missing_ids"])}
     # hai mẫu số KHÁC nhau (PRD v1.1 §24.1): xong/đã-chọn và đã-chọn/toàn-tập. Không biết toàn tập thì ghi unknown, không báo 100%.
     out["coverage"] = {"completed/selected": f"{out['counts']['received']}/{len(expected)}",
@@ -1404,7 +1535,8 @@ def main(argv=None):
     p = sp.add_parser("audit-edges"); p.add_argument("id"); p.add_argument("--json", action="store_true"); p.add_argument("--strict", action="store_true", help="rc 2 khi còn EDGE_UNJUSTIFIED"); p.set_defaults(f=cmd_audit_edges)
     p = sp.add_parser("control"); p.add_argument("id"); p.add_argument("action", choices=["pause", "resume", "cancel", "status"]); p.add_argument("--by", default=os.environ.get("USER", "agent")); p.set_defaults(f=cmd_control)
     p = sp.add_parser("reconcile-items", help="manifest đã seal × verdict rows → thiếu/thừa/trùng theo ĐỊNH DANH; rc 2 khi thiếu hoặc lỗi giao thức")
-    p.add_argument("--expected", default=""); p.add_argument("--expected-file", default=""); p.add_argument("--verdicts", required=True); p.add_argument("--universe", type=int, help="số item ĐÃ BIẾT của toàn tập nguồn (bỏ trống = unknown)"); p.set_defaults(f=cmd_reconcile_items)
+    p.add_argument("--expected", default=""); p.add_argument("--expected-file", default=""); p.add_argument("--verdicts", required=True); p.add_argument("--universe", type=int, help="số item ĐÃ BIẾT của toàn tập nguồn (bỏ trống = unknown)")
+    p.add_argument("--allow-empty", action="store_true", help="manifest rỗng là hợp lệ (mặc định: lỗi EMPTY_MANIFEST)"); p.set_defaults(f=cmd_reconcile_items)
     p = sp.add_parser("dry-streak"); p.add_argument("--prev", type=int, required=True); p.add_argument("--complete", type=int, choices=[0, 1], required=True)
     p.add_argument("--new", type=int, required=True); p.add_argument("--stop-after", type=int, default=2); p.set_defaults(f=cmd_dry_streak)
     p = sp.add_parser("cost-envelope"); p.add_argument("id"); p.add_argument("--reviewers", type=int, default=1); p.add_argument("--max-attempts", type=int, default=3); p.set_defaults(f=cmd_cost_envelope)

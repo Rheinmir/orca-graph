@@ -309,9 +309,9 @@ def render_graph(gp: Path, out: Path, answers: list, png: str = "") -> None:
     for i, n in nodes.items():
         col = STATE_COLOR.get(n.get("state", "proposed"))
         card_body[i] = f'''<h3>{i} — {html.escape(n["title"])}<span class="st" style="background:{col}">{html.escape(STATE_VI.get(n.get("state",""), ""))}</span></h3>
-<ul><li><b>Cần xong trước</b> (deps): {", ".join(f"<code>{d}</code>" + (f" <i>({html.escape(r)})</i>" if (r := (n.get("dep_reasons") or {}).get(d)) else "") for d in n["deps"]) or "— (gốc)"} <span class="badge">{n.get("deps_conf","")}</span></li>
+<ul><li><b>Cần xong trước</b> (deps): {", ".join(f"<code>{html.escape(d)}</code>" + (f" <i>({html.escape(r)})</i>" if (r := (n.get("dep_reasons") or {}).get(d)) else "") for d in n["deps"]) or "— (gốc)"} <span class="badge">{n.get("deps_conf","")}</span></li>
 <li><b>Mở khoá cho</b>: {", ".join(f"<code>{d}</code>" for d in down[i]) or "— (lá)"}</li>
-<li><b>Kiểu / chế độ</b>: {n.get("kind","")} / {"cần người (HITL)" if n.get("mode")=="hitl" else "agent tự chạy (AFK)"}</li>
+<li><b>Kiểu / chế độ</b>: {html.escape(n.get("kind",""))} / {"cần người (HITL)" if n.get("mode")=="hitl" else "agent tự chạy (AFK)"}</li>
 <li><b>File chạm</b>: {", ".join(f"<code>{html.escape(f)}</code>" for f in n.get("files", [])) or "—"}</li>
 <li><b>Tài nguyên giữ khi chạy</b> (claim — tranh chấp tài nguyên, không phải cạnh DAG): {", ".join(f"<code>{html.escape(c['key'])}</code> {c['mode']}" + (f":{c['units']}" if c.get("units") else "") for c in n.get("resources", [])) or "—"}</li>
 <li><b>Làm ra</b>: {html.escape("; ".join(n.get("produces", []))[:220]) or "—"}</li>

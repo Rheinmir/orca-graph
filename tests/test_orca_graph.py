@@ -3,6 +3,7 @@ kill -9 giữa lúc ghi không hỏng sổ (Reprise PRD bất biến 6) · audit
 import importlib.util, json, os, signal, subprocess, sys, time
 from pathlib import Path
 
+os.environ.setdefault("ORCA_GRAPH_NO_ROOM", "1")     # test engine độc lập: không gọi cockpit overstack của máy thật mỗi lần emit
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = ROOT / "engine/orca-graph.py"
 _spec = importlib.util.spec_from_file_location("og", SCRIPT)
@@ -732,3 +733,145 @@ def test_VT26_VT27_stale_results_never_join_the_new_plan(tmp_path):
     run(tmp_path, "set", gid, "t1", "done", "--gen", "1", "--plan-version", "2")
     p.write_text(p.read_text().replace("- Tạo: `a.py`", "- Tạo: `a2.py`"), encoding="utf-8"); run(tmp_path, "build", str(p))
     assert {x["id"]: x for x in og.Store(tmp_path, gid).load()["nodes"]}["t1"]["fresh"] == "stale"
+
+
+# ---------- v3 · hồi quy từ review độc lập 20/09/2026 (mỗi test = một lỗi đã tái hiện được) ----------
+def _task(i, extra="", files=None):
+    return f"### Task {i}: việc {i}\n**Files:**\n- Tạo: `{files or f'f{i}.py'}`\n**Interfaces:**\n- Consumes: —\n- Produces: `o{i}`\n{extra}**Verify:** `true`\n"
+
+
+def _build(tmp_path, text, name="rv"):
+    p = tmp_path / f"{name}-PLAN.md"; p.write_text(text, encoding="utf-8")
+    return run(tmp_path, "build", str(p)), p
+
+
+def test_review_C3_parser_refuses_to_swallow_unresolvable_depends(tmp_path):
+    """Cạnh bị nuốt im lặng = node ready sớm mà audit-edges không thấy. Token không hiểu phải là LỖI TO."""
+    for bad in ("Task 1 (data) — vì cần schema", "Task 1 (data; schema)", "Task 1 và Task 2", "Task 9", "Task 3", "<img src=x>/t1 (control)", "Task 1 (data), Task 1 (control)"):
+        r, _ = _build(tmp_path, "# R\n" + _task(1) + _task(2) + _task(3, f"**Depends:** {bad}\n"))
+        assert r.returncode != 0 and "Depends" in r.stderr, (bad, r.stdout, r.stderr)
+    ok = {"Task 1 (effect-order)": (["t1"], {"t1": "effect_order"}), "`Task 1 (data)`, t2 (contract)": (["t1", "t2"], {"t1": "data", "t2": "contract"}),
+          "Task 1; Task 2 (DATA)": (["t1", "t2"], {"t2": "data"}), "Task 1, Task 1": (["t1"], {}), "other-g/t3 (control)": (["other-g/t3"], {"other-g/t3": "control"}), "—": ([], {})}
+    for dep, (deps, reasons) in ok.items():
+        n = og.parse_plan("# R\n" + _task(1) + _task(2) + _task(3, f"**Depends:** {dep}\n"))[2]
+        assert n["deps"] == deps and n.get("dep_reasons", {}) == reasons, (dep, n["deps"], n.get("dep_reasons"))
+    r, _ = _build(tmp_path, "# R\n" + _task(1, "**Kind:** <img src=x onerror=alert(2)>\n"))
+    assert r.returncode != 0 and "Kind" in r.stderr
+
+
+FENCE_PLAN = "# F\n" + _task(1).replace("**Verify:**", "```md\n### Task 9: mẫu trong fence\n**Depends:** Task 0\n## Không phải mục thật\n```\n**Verify:**") + _task(2) + \
+             "\n```md\n### Task 7: mẫu sau task cuối\n```\n\n## Origin\n\n- x\n"
+
+
+def test_review_C1_V7_add_node_sees_plan_like_the_parser_fences_ignored(tmp_path):
+    r, p = _build(tmp_path, FENCE_PLAN, "fz"); assert r.returncode == 0, r.stderr
+    r = run(tmp_path, "add-node", "fz", "--title", "Chèn", "--blocks", "t1", "--files", "z.py", "--verify", "true", "--no-viz")
+    assert r.returncode == 0 and "+ t3" in r.stdout, r.stdout + r.stderr                 # id kế tiếp là t3, không phải t10 (Task 9 trong fence là mẫu)
+    text = p.read_text()
+    assert "**Depends:** Task 0\n" in text                                                # dòng mẫu trong fence KHÔNG bị sửa
+    assert text.index("### Task 3: Chèn") < text.index("## Origin")                       # không bị đẩy ra sau ## Origin
+    n = {x["id"]: x for x in og.Store(tmp_path, "fz").load()["nodes"]}
+    assert n["t1"]["deps"] == ["t3"] and n["t1"]["state"] == "proposed"                   # chèn-vào-giữa có tác dụng THẬT
+
+
+def test_review_C2_concurrent_add_node_does_not_lose_a_task(tmp_path):
+    r, p = _build(tmp_path, "# C\n" + _task(1), "cc"); assert r.returncode == 0
+    procs = [subprocess.Popen([sys.executable, str(SCRIPT), "--dir", str(tmp_path), "add-node", "cc", "--title", f"song song {k}", "--files", f"s{k}.py", "--verify", "true", "--no-viz"],
+                              cwd=ROOT, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True) for k in range(4)]
+    outs = [q.communicate() for q in procs]
+    assert all(q.returncode == 0 for q in procs), outs
+    g = og.Store(tmp_path, "cc").load()
+    assert sorted(n["id"] for n in g["nodes"]) == ["t1", "t2", "t3", "t4", "t5"] and g["plan_version"] == 5
+    assert sorted(n["title"] for n in g["nodes"] if n["id"] != "t1") == [f"song song {k}" for k in range(4)]
+
+
+def test_review_V6_add_node_rejects_structure_injection(tmp_path):
+    r, p = _build(tmp_path, "# I\n" + _task(1) + _task(2), "inj"); before = p.read_text()
+    for field, val in (("--produces", "x\n### Task 7: injected"), ("--verify", "true\n**Depends:** Task 2"), ("--files", "a.py\n- Sửa: `b.py`"), ("--title", "a\nb")):
+        args = ["add-node", "inj", "--title", "T", "--files", "z.py", "--verify", "true", "--no-viz"]
+        args = [x for x in args] + [field, val] if field != "--title" else ["add-node", "inj", "--title", val, "--no-viz"]
+        r = run(tmp_path, *args)
+        assert r.returncode != 0 and "xuống dòng" in r.stderr, (field, r.stdout, r.stderr)
+    assert p.read_text() == before
+    assert run(tmp_path, "add-node", "inj", "--title", "T", "--depends", "Task 1:DATA,t2:scheduling_preference", "--files", "z.py", "--verify", "true", "--no-viz").returncode == 0
+    assert {x["id"]: x for x in og.Store(tmp_path, "inj").load()["nodes"]}["t3"]["dep_reasons"] == {"t1": "data", "t2": "preference"}
+
+
+def test_review_add_node_refuses_blocks_on_running_node_and_mismatched_plan(tmp_path):
+    r, p = _build(tmp_path, "# B\n" + _task(1) + _task(2), "bk")
+    assert run(tmp_path, "lock", "bk", "t1").returncode == 0
+    r = run(tmp_path, "add-node", "bk", "--title", "T", "--blocks", "t1", "--files", "z.py", "--verify", "true", "--no-viz")
+    assert r.returncode != 0 and "đang locked" in r.stderr
+    p.write_text(p.read_text() + _task(5), encoding="utf-8")                              # PLAN sửa tay mà chưa build
+    r = run(tmp_path, "add-node", "bk", "--title", "T", "--files", "z.py", "--verify", "true", "--no-viz")
+    assert r.returncode != 0 and "không khớp graph" in r.stderr
+
+
+def test_VT27_review_C4_run_result_from_old_plan_is_stale_after_midrun_replan(tmp_path):
+    """VT-27 đường `run`: replan GIỮA lúc agent chạy → kết quả thuộc plan cũ, không publish; node về ready để làm lại theo spec mới."""
+    r, p = _build(tmp_path, "# V\n" + _task(1), "vv"); assert r.returncode == 0
+    env = dict(os.environ, ORCA_GRAPH_HOME=str(tmp_path / "home"), ORCA_GRAPH_NO_DAEMON="1")
+    q = subprocess.Popen([sys.executable, str(SCRIPT), "--dir", str(tmp_path), "run", "vv", "t1", "--hb", "0.2", "--", "sh", "-c", "sleep 1.5"],
+                         cwd=ROOT, env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    time.sleep(0.7)
+    p.write_text(p.read_text().replace("việc 1", "việc 1 ĐỔI").replace("f1.py", "g1.py"), encoding="utf-8")
+    assert run(tmp_path, "build", str(p)).returncode == 0
+    out, err = q.communicate()
+    n = og.Store(tmp_path, "vv").load()["nodes"][0]
+    assert "STALE" in out and n["state"] == "ready" and n["verified"] == "unverified", out + err
+    assert q.returncode != 0 and not (tmp_path / "vv.locks" / "t1").exists()
+
+
+def test_review_V1_V2_expired_or_unlocked_holder_does_not_block_other_graph_forever(tmp_path):
+    a, _ = setup_res(tmp_path, ["head"], "ha"); b, _ = setup_res(tmp_path, ["head"], "hb")
+    assert run(tmp_path, "lock", a, "t1", "--lease-sec", "1").returncode == 0
+    time.sleep(1.3)
+    r = run(tmp_path, "lock", b, "t1")                                                    # lease của ha/t1 đã hết — không ai gọi `next ha`
+    assert r.returncode == 0, r.stderr
+    assert {n["id"]: n["state"] for n in og.Store(tmp_path, a).load()["nodes"]}["t1"] == "unknown"
+    assert run(tmp_path, "unlock", b, "t1").returncode == 0                               # unlock tay: state phải rời `locked`, không thì giữ claim mãi
+    assert {n["id"]: n["state"] for n in og.Store(tmp_path, b).load()["nodes"]}["t1"] == "unknown"
+    c, _ = setup_res(tmp_path, ["head"], "hc")
+    assert run(tmp_path, "lock", c, "t1").returncode == 0
+
+
+def test_VT03_review_V4_capacity_is_a_pool_size_not_order_dependent(tmp_path):
+    """Pool của key = capacity NHỎ NHẤT đã khai; holder shared cũng chiếm slot; capacity:0 bị từ chối."""
+    gid, _ = setup_res(tmp_path, ["api(capacity:1)", "api(capacity:3)", "api(shared)"], "cp")
+    assert run(tmp_path, "lock", gid, "t1").returncode == 0
+    for n in ("t2", "t3"):                                                                # t1 khai pool = 1 → không ai vào thêm, kể cả `shared`
+        r = run(tmp_path, "lock", gid, n); assert r.returncode != 0 and "capacity 1/1" in r.stderr, (n, r.stderr)
+    gid2, _ = setup_res(tmp_path, ["q(shared)", "q(shared)", "q(capacity:2)"], "cq")
+    assert run(tmp_path, "lock", gid2, "t1").returncode == 0 and run(tmp_path, "lock", gid2, "t2").returncode == 0
+    r = run(tmp_path, "lock", gid2, "t3"); assert r.returncode != 0 and "capacity 2/2" in r.stderr
+    p = tmp_path / "z-PLAN.md"; p.write_text(res_plan(["k(capacity:0)"]), encoding="utf-8")
+    assert run(tmp_path, "build", str(p)).returncode != 0
+
+
+def test_VT01_review_V5_audit_keeps_preference_edge_when_downstream_uses_upstream_output(tmp_path):
+    plan = "# A\n### Task 1: parser\n**Files:**\n- Tạo: `parser.py`\n**Interfaces:**\n- Consumes: —\n- Produces: parse(text) -> list\n**Verify:** `true`\n" \
+           "### Task 2: dùng parser\n**Files:**\n- Tạo: `use.py`\n**Interfaces:**\n- Consumes: parse(text) -> list từ parser.py\n- Produces: `x`\n**Depends:** Task 1 (preference)\n**Verify:** `python3 -c \"import parser\"`\n"
+    r, _ = _build(tmp_path, plan, "au"); assert r.returncode == 0, r.stderr
+    out = json.loads(run(tmp_path, "audit-edges", "au", "--json").stdout)
+    assert out["diff"]["remove_preference_edges"] == [] and out["findings"][0]["code"] == "PREFERENCE_HAS_HIDDEN_CONSTRAINT"
+
+
+def test_review_V3_admission_mutex_has_no_overlap_under_contention(tmp_path):
+    """6 process giành mutex 40 vòng: không bao giờ có 2 process cùng ở trong vùng găng (bản O_EXCL+mtime từng lọt 1/150)."""
+    code = ("import importlib.util,sys,time,os;from pathlib import Path\n"
+            f"s=importlib.util.spec_from_file_location('og',r'{SCRIPT}');og=importlib.util.module_from_spec(s);s.loader.exec_module(og)\n"
+            "d=Path(sys.argv[1])\nfor _ in range(40):\n with og.admission_mutex(d):\n  f=d/'in';assert not f.exists(),'OVERLAP';f.write_text('x');time.sleep(0.002);f.unlink()\n")
+    procs = [subprocess.Popen([sys.executable, "-c", code, str(tmp_path)], stderr=subprocess.PIPE, text=True) for _ in range(6)]
+    errs = [q.communicate()[1] for q in procs]
+    assert all(q.returncode == 0 for q in procs), [e[-300:] for e in errs if e]
+
+
+def test_VT10_review_T2_reconcile_items_never_drops_error_rows_or_defaults_to_complete(tmp_path):
+    v = _verdicts(tmp_path, [{"item_id": "A", "verdict": "supported"}, {"item_id": "A", "status": "timeout", "verdict": None}])
+    assert json.loads(run(tmp_path, "reconcile-items", "--expected", "A", "--verdicts", v).stdout) == {"protocol_error": "CONFLICTING_OUTCOME"}
+    v = _verdicts(tmp_path, [{"item_id": "A", "verdict": "supported"}, {"item_id": "Z", "verdict": None}])
+    assert json.loads(run(tmp_path, "reconcile-items", "--expected", "A", "--verdicts", v).stdout) == {"protocol_error": "UNEXPECTED_ITEM_ID"}
+    r = run(tmp_path, "reconcile-items", "--expected", "A", "--verdicts", str(tmp_path / "khong-co.jsonl"))
+    assert r.returncode == 2 and "VERDICTS_FILE_NOT_FOUND" in r.stdout
+    r = run(tmp_path, "reconcile-items", "--verdicts", v)
+    assert r.returncode == 2 and "EMPTY_MANIFEST" in r.stdout
