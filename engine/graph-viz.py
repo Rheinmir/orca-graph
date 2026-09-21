@@ -220,7 +220,7 @@ svg .st{font-weight:400;fill:var(--t2);font-size:10.5px}svg .ttl{font-size:11.5p
 .legend{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:11px;color:var(--t2);margin:10px 2px}.legend i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:5px;vertical-align:-1px}
 table{width:100%;border-collapse:collapse;font-size:12.5px;background:var(--glass3);backdrop-filter:blur(20px);border:1px solid var(--border);border-radius:var(--r);overflow:hidden}
 th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--border);vertical-align:top}th{font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;color:var(--t2)}
-tr:last-child td{border-bottom:0}code,.path{font:11.5px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;background:var(--glass1);padding:1px 5px;border-radius:5px}
+tr:last-child td{border-bottom:0}code,.path{font:11.5px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;background:var(--glass1);padding:1px 5px;border-radius:5px;display:inline-block;margin-block:5px}
 .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px}.node-card{scroll-margin-top:20px}.node-card h3{margin:0 0 4px;font-size:13px}
 .node-card .st,.st-badge{font-size:10.5px;padding:2px 8px;border-radius:999px;margin-left:6px;vertical-align:1px}
 .node-card ul{margin:6px 0 0;padding-left:16px;font-size:12px;color:var(--t2)}.node-card li b{color:var(--t1)}
