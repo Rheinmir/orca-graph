@@ -874,7 +874,7 @@ def emit(st: Store, g: dict, nid: str, to: str, by="", note="", op_key="", gen=N
         # làm việc đó. Hệ quả đo 200926: cả một phiên 12 node không ai canh lease, control-room chỉ vẽ lại khi state đổi rồi
         # đứng im. Node bắt đầu chạy bằng đường nào thì cũng phải có người canh.
         registry_add(st.d); spawn_daemon()
-    regen_room()
+    regen_room([st.d])
     return True
 
 
@@ -1245,20 +1245,33 @@ def cmd_run(a):
     sys.exit(0 if to == "done" else p.returncode or 1)
 
 
-def regen_room() -> None:
+def _room_builder(hints=()) -> "Path | None":   # chuỗi: engine phải chạy được cả trên Python 3.9
+    """Builder của DỰ ÁN chứa graph trước, rồi cwd, rồi cây cạnh engine, cuối cùng bản cài global.
+
+    Vì sao phải đi từ thư mục graph: daemon (`watch_once`) chạy với cwd BẤT KỲ, còn engine cài ở
+    ~/.orca-graph nên `__file__`.parents[2] không có fdk/tools/ → cả hai neo kia đều trượt xuống bản
+    global ~/.claude/harness (cũ hơn repo). Bug thật 20/09/2026: mỗi lượt daemon vẽ đè cockpit bằng CSS
+    cũ, trang kanban mọc lại sọc viền một cạnh sau khi repo đã sửa — và không ai thấy vì daemon im lặng."""
+    seen, cands = set(), []
+    for d in list(hints) + [Path.cwd()]:
+        d = Path(d).resolve()
+        for anc in [d, *d.parents]:
+            if anc in seen:
+                break
+            seen.add(anc); cands.append(anc / "fdk/tools/build-control-room.py")
+    cands += [Path(__file__).resolve().parents[2] / "fdk/tools/build-control-room.py",
+              Path.home() / ".claude/harness/fdk/tools/build-control-room.py"]
+    return next((c for c in cands if c.is_file()), None)
+
+
+def regen_room(hints=()) -> None:
     """Vẽ lại cockpit (rẻ ~100 ms) — gọi ở MỌI lần state đổi (emit) + mỗi lượt daemon/run để trang LIVE.
     stdout KHÔNG bị nuốt: build-control-room.py tự in 3 dòng `→ <path>` (cockpit/detail/kanban) —
     đó là cách duy nhất path lộ ra cho user, không dựa vào model tự nhớ."""
     if os.environ.get("ORCA_GRAPH_NO_ROOM"):
         return
-    # Thứ tự tra: DỰ ÁN đang đứng trước, rồi cây cạnh engine, cuối cùng bản cài global.
-    # Đặt global lên trước là bug thật (20/09/2026): engine cài ở ~/.orca-graph nên parents[2] không có
-    # fdk/tools/ → mọi lần emit vẽ lại cockpit bằng builder CŨ ở ~/.claude/harness, ghi đè bản repo vừa sửa.
-    cands = [Path.cwd() / "fdk/tools/build-control-room.py",
-             Path(__file__).resolve().parents[2] / "fdk/tools/build-control-room.py",
-             Path.home() / ".claude/harness/fdk/tools/build-control-room.py"]
-    br = next((c for c in cands if c.exists()), cands[-1])
-    if br.exists():
+    br = _room_builder(hints)
+    if br:
         subprocess.call([sys.executable, str(br)], stderr=subprocess.DEVNULL)
 
 
@@ -1292,7 +1305,7 @@ def watch_once(build_room: bool = True) -> int:
     if total > r.get("max_running", 4):
         print(f"  ⚠ {total} node đang chạy > trần toàn máy {r.get('max_running', 4)}")
     if build_room:
-        regen_room()          # mỗi lượt, không chỉ khi reaper đổi state — lease còn/số node chạy đổi liên tục
+        regen_room(r["dirs"])  # mỗi lượt, không chỉ khi reaper đổi state — lease còn/số node chạy đổi liên tục
     return total
 
 

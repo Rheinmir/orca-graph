@@ -939,7 +939,6 @@ def test_state_badge_text_meets_contrast_on_every_state_colour():
 def test_regen_room_prefers_project_builder_over_global_install(tmp_path, monkeypatch):
     """Engine cài ở ~/.orca-graph nên không có fdk/tools/ cạnh nó; nếu tra global trước thì mọi lần emit
     vẽ lại cockpit bằng builder CŨ, ghi đè bản repo vừa sửa (gặp thật 20/09/2026)."""
-    import subprocess as sp
     proj = tmp_path / "proj" / "fdk" / "tools"
     proj.mkdir(parents=True)
     builder = proj / "build-control-room.py"
@@ -949,4 +948,23 @@ def test_regen_room_prefers_project_builder_over_global_install(tmp_path, monkey
     monkeypatch.chdir(tmp_path / "proj")
     monkeypatch.delenv("ORCA_GRAPH_NO_ROOM", raising=False)
     og.regen_room()
+    assert called and called[0] == str(builder), called
+
+
+def test_regen_room_finds_builder_from_graph_dir_when_cwd_is_elsewhere(tmp_path, monkeypatch):
+    """Daemon chạy với cwd BẤT KỲ: phải đi từ thư mục graph lên mới thấy builder của dự án,
+    nếu không thì mỗi lượt daemon vẽ đè cockpit bằng bản global cũ (bug thật 20/09/2026)."""
+    proj = tmp_path / "proj"
+    (proj / "fdk" / "tools").mkdir(parents=True)
+    builder = proj / "fdk" / "tools" / "build-control-room.py"
+    builder.write_text("#!/usr/bin/env python3\n", encoding="utf-8")
+    graphs = proj / "llmwiki" / "graph"
+    graphs.mkdir(parents=True)
+    elsewhere = tmp_path / "elsewhere"
+    elsewhere.mkdir()
+    called = []
+    monkeypatch.setattr(og.subprocess, "call", lambda argv, **kw: called.append(argv[1]) or 0)
+    monkeypatch.chdir(elsewhere)
+    monkeypatch.delenv("ORCA_GRAPH_NO_ROOM", raising=False)
+    og.regen_room([graphs])
     assert called and called[0] == str(builder), called
