@@ -934,3 +934,19 @@ def test_state_badge_text_meets_contrast_on_every_state_colour():
         assert f"color:{fg}" in gv.state_badge_style(state)
     css = gv.CSS
     assert "border-left-color:var(--accent)" not in css and ".chip b{color:var(--accent-ink)}" in css
+
+
+def test_regen_room_prefers_project_builder_over_global_install(tmp_path, monkeypatch):
+    """Engine cài ở ~/.orca-graph nên không có fdk/tools/ cạnh nó; nếu tra global trước thì mọi lần emit
+    vẽ lại cockpit bằng builder CŨ, ghi đè bản repo vừa sửa (gặp thật 20/09/2026)."""
+    import subprocess as sp
+    proj = tmp_path / "proj" / "fdk" / "tools"
+    proj.mkdir(parents=True)
+    builder = proj / "build-control-room.py"
+    builder.write_text("#!/usr/bin/env python3\n", encoding="utf-8")
+    called = []
+    monkeypatch.setattr(og.subprocess, "call", lambda argv, **kw: called.append(argv[1]) or 0)
+    monkeypatch.chdir(tmp_path / "proj")
+    monkeypatch.delenv("ORCA_GRAPH_NO_ROOM", raising=False)
+    og.regen_room()
+    assert called and called[0] == str(builder), called

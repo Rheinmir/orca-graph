@@ -1251,9 +1251,13 @@ def regen_room() -> None:
     đó là cách duy nhất path lộ ra cho user, không dựa vào model tự nhớ."""
     if os.environ.get("ORCA_GRAPH_NO_ROOM"):
         return
-    br = Path(__file__).resolve().parents[2] / "fdk/tools/build-control-room.py"
-    if not br.exists():
-        br = Path.home() / ".claude/harness/fdk/tools/build-control-room.py"
+    # Thứ tự tra: DỰ ÁN đang đứng trước, rồi cây cạnh engine, cuối cùng bản cài global.
+    # Đặt global lên trước là bug thật (20/09/2026): engine cài ở ~/.orca-graph nên parents[2] không có
+    # fdk/tools/ → mọi lần emit vẽ lại cockpit bằng builder CŨ ở ~/.claude/harness, ghi đè bản repo vừa sửa.
+    cands = [Path.cwd() / "fdk/tools/build-control-room.py",
+             Path(__file__).resolve().parents[2] / "fdk/tools/build-control-room.py",
+             Path.home() / ".claude/harness/fdk/tools/build-control-room.py"]
+    br = next((c for c in cands if c.exists()), cands[-1])
     if br.exists():
         subprocess.call([sys.executable, str(br)], stderr=subprocess.DEVNULL)
 
