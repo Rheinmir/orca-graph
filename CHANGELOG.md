@@ -1,5 +1,17 @@
 # Changelog
 
+## 3.2.0 — 2026-09-22
+
+### Changed
+- Font mặc định của mọi trang engine sinh ra đổi từ Lexend Deca 300 sang **Be Vietnam Pro** 400/600/800 (theme đọc kiểu Vietcetera), vẫn nhúng base64, offline vẫn đúng font. Be Vietnam Pro không có bản variable nên nhúng ba file tĩnh (≈95 KB); xin 500 ra 400, xin 700 ra 800. Tiêu đề 800, h1/h2 siết `letter-spacing:-.03em`. Bản sao từ framework `fdk/tools/html_font.py` + `html_base.py`.
+- Lớp nền (`html_base`) tắt hiệu ứng khi hệ điều hành bật giảm chuyển động (`@media (prefers-reduced-motion: reduce)`).
+
+### Fixed
+- `html_font.apply` / `html_base.apply` LÀM MỚI khối `<style id="ovs-font">` / `ovs-base` cũ thay vì bỏ qua vì "đã có" — trang/template nhúng font cũ không còn kẹt mãi.
+
+### Removed
+- `engine/LexendDeca-NOTICE.txt` (thay bằng `engine/BeVietnamPro-NOTICE.txt`; `install.sh` tải file mới).
+
 ## 3.1.1 — 2026-09-20
 
 ### Fixed

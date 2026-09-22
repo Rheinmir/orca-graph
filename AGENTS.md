@@ -5,7 +5,7 @@
 |---|---|
 | Logic engine: parser PLAN, state machine, lock/lease/claim, audit-edges, add-node, reconcile-items… | `engine/orca-graph.py` |
 | Vẽ 1 graph / atlas, sổ icon theo Kind | `engine/graph-viz.py` · `engine/graph-atlas.py` · `engine/kind-glyphs.json` |
-| Font mặc định của trang sinh ra (Lexend Deca Light, nhúng) — **BẢN SAO**, nguồn ở framework `fdk/tools/html_font.py`; đổi ở đó rồi chép đè | `engine/html_font.py` · `engine/html_font_data.py` · `engine/html_base.py` (lớp nền: token sáng/tối, toggle, quy ước viết hoa) |
+| Font mặc định của trang sinh ra (Be Vietnam Pro 400/600/800, nhúng) — **BẢN SAO**, nguồn ở framework `fdk/tools/html_font.py`; đổi ở đó rồi chép đè | `engine/html_font.py` · `engine/html_font_data.py` · `engine/html_base.py` (lớp nền: token sáng/tối, toggle, quy ước viết hoa) |
 | Skill `/orca-graph` (bản CANONICAL) | `skills/orca-graph/SKILL.md` |
 | Test engine, test cài đặt | `tests/` |
 | Ma trận nghiệm thu VT-01…28 (PRD Reprise v1.1 §30.1) + scoreboard + history | `evals/` |

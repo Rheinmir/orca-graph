@@ -34,7 +34,7 @@ _FALLBACK_REGISTRY = {"build": {"icon": "🔧", "shape": "circle", "color": "#3b
 
 
 def ovs_font(html_doc: str) -> str:
-    """Font mặc định cho mọi trang engine sinh ra = Lexend Deca Light, NHÚNG base64 (offline vẫn đúng font).
+    """Font mặc định cho mọi trang engine sinh ra = Be Vietnam Pro, NHÚNG base64 (offline vẫn đúng font).
     html_font.py nằm cạnh engine THẬT (`_ENGINE_DIR` — dưới shim `__file__` là đường shim nên không dùng with_name)."""
     import importlib.util
     for c in (_ENGINE_DIR / "html_font.py", Path.home() / ".claude/harness/fdk/tools/html_font.py"):
