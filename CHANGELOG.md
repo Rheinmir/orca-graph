@@ -1,5 +1,11 @@
 # Changelog
 
+## 3.2.1 — 2026-09-25
+
+### Changed
+- Lớp nền (bản sao `html_base.py` + `html_font*.py` từ framework): hàng chip/chú giải/chỉ số rơi dòng tự giữ **một dòng**, mờ mép phải khi tràn, rê chuột hoặc focus thì thấy đủ — áp cho cả trang đồ thị và atlas. Ô nhập không viền, không vòng focus; nền đậm dần khi hover/focus.
+- Hằng `VERSION` trong `orca-graph.py` khớp lại file `VERSION` (trước đó ghi 3.1.1 trong khi phát hành 3.2.0).
+
 ## 3.2.0 — 2026-09-22
 
 ### Changed

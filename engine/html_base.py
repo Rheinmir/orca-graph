@@ -45,9 +45,19 @@ def _vars(d: dict) -> str:
 
 
 def base_css(*, family_dark: bool) -> str:
+    F = "input:is(:not([type]),[type=text],[type=search],[type=email],[type=url],[type=tel],[type=password],[type=number]),textarea"
+    H = "input:is(:not([type]),[type=text],[type=search],[type=email],[type=url],[type=tel],[type=password],[type=number]):hover,textarea:hover"
+    Fo = "input:is(:not([type]),[type=text],[type=search],[type=email],[type=url],[type=tel],[type=password],[type=number]):focus,textarea:focus"
+    I = "input:is(:not([type]),[type=text],[type=search],[type=email],[type=url],[type=tel],[type=password],[type=number])[aria-invalid=true],textarea[aria-invalid=true]"
+    IF = "input:is(:not([type]),[type=text],[type=search],[type=email],[type=url],[type=tel],[type=password],[type=number])[aria-invalid=true]:focus,textarea[aria-invalid=true]:focus"
     dark = _vars(DARK) + (_FAMILY_DARK.format(**DARK) if family_dark else "")
     return (
-        f":root{{{_vars(LIGHT)}--sp-1:4px;--sp-2:8px;--sp-3:12px;--sp-4:16px;--sp-5:24px;--sp-6:32px;--ovs-r:14px;color-scheme:light}}"
+        f":root{{{_vars(LIGHT)}--sp-1:4px;--sp-2:8px;--sp-3:12px;--sp-4:16px;--sp-5:24px;--sp-6:32px;--sp-7:40px;--sp-8:48px;--sp-9:64px;--sp-10:80px;--sp-11:96px;"
+        f"--lh-body:1.75;--lh-heading:1.25;--measure:35em;--ovs-r:14px;color-scheme:light}}"
+        # nhịp chữ mặc định (PLAN 220926-spacing-system, chuẩn WCAG 1.4.12/USWDS): :where = độ ưu tiên 0 → trang tự đặt vẫn thắng
+        ":where(p,li,dd,blockquote){line-height:var(--lh-body)}:where(h1,h2,h3){line-height:var(--lh-heading)}"
+        # sentence-case cho MỌI tiêu đề, kể cả tiêu đề JS sinh lúc chạy (phép vá HTML không với tới) — :where = trang tự đặt vẫn thắng
+        ":where(h1,h2,h3,h4,h5,h6,summary,legend)::first-letter{text-transform:uppercase}"
         f"html[data-theme=dark]{{{dark}color-scheme:dark}}"
         + ("html[data-theme=dark] body{background:var(--ovs-bg);color:var(--ovs-ink)}" if family_dark else "")
         + ".ovs-card{background:var(--ovs-surface);border:1px solid var(--ovs-border);border-radius:var(--ovs-r);padding:var(--sp-4);"
@@ -65,15 +75,42 @@ def base_css(*, family_dark: bool) -> str:
           ".ovs-theme i{width:14px;height:14px;border-radius:50%;box-shadow:inset -4px -3px 0 0 currentColor;display:inline-block}"
           "html[data-theme=dark] .ovs-theme i{box-shadow:none;background:currentColor}"
           "@media print{.ovs-theme{display:none}}"
+          # hàng một dòng (user 24/09 "tràn thì không xuống dòng, chỉ mờ đi; hover thấy đủ" — luật row-wrap): mờ mép phải CHỈ khi tràn thật
+          # (cờ data-clip do LINE_JS đặt); hover/focus bung ra đủ nội dung. Dùng cho hàng chip/chỉ số/meta/breadcrumb — không cho đoạn văn.
+          # ô nhập (user 24/09 "viền khoanh tròn là slop" — luật field-ring): không viền, không vòng; nền pha từ màu chữ của chính ô
+          # (currentColor → đúng cả trang sáng/tối/tự quản theme), hover đậm hơn, focus đậm nữa. !important: quy tắc NHÀ, trang không ghi đè.
+          f"{F}{{border-color:transparent!important;box-shadow:none!important;background:color-mix(in srgb,currentColor 6%,transparent)!important;transition:background-color .12s ease-out}}"
+          f"{H}{{background:color-mix(in srgb,currentColor 9%,transparent)!important}}"
+          f"{Fo}{{outline:none!important;box-shadow:none!important;background:color-mix(in srgb,currentColor 13%,transparent)!important}}"
+          f"{I}{{background:color-mix(in srgb,var(--ovs-bad,#c0392b) 12%,transparent)!important}}{IF}{{background:color-mix(in srgb,var(--ovs-bad,#c0392b) 20%,transparent)!important}}"
+          # !important: ovs-line là HỢP ĐỒNG hành vi — CSS riêng của trang (.kpi{flex-wrap:wrap} đặt sau lớp nền) không được phá nó
+          ".ovs-line{display:flex;flex-wrap:nowrap!important;white-space:nowrap!important;overflow:hidden!important;min-width:0}.ovs-line>*{flex:none!important}"
+          ".ovs-line[data-clip]{-webkit-mask-image:linear-gradient(90deg,#000 calc(100% - 56px),transparent);mask-image:linear-gradient(90deg,#000 calc(100% - 56px),transparent)}"
+          ".ovs-line[data-clip]:hover,.ovs-line[data-clip]:focus-within{flex-wrap:wrap!important;white-space:normal!important;overflow:visible!important;-webkit-mask-image:none;mask-image:none}"
           # người dùng bật "giảm chuyển động" ở hệ điều hành → tắt mọi hiệu ứng trên MỌI trang sinh ra (luật reduced-motion-missing, 21/09/2026)
           "@media (prefers-reduced-motion: reduce){*,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;"
           "transition-duration:.01ms!important;scroll-behavior:auto!important}}")
 
 
-# Chống nháy: chạy TRƯỚC khi trình duyệt vẽ — đặt data-theme từ lựa chọn đã nhớ, chưa có thì theo hệ điều hành.
+# Chống nháy: chạy TRƯỚC khi trình duyệt vẽ — đặt data-theme từ lựa chọn đã nhớ, chưa có thì SÁNG (mặc định framework,
+# user chốt 22/09/2026: "kêu mặc định lightmode cơ mà" — không theo prefers-color-scheme của hệ điều hành).
 BOOT_JS = ("(function(){try{var d=document.documentElement,s=localStorage.getItem('%s');"
-           "d.setAttribute('data-theme',s||(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light'))}catch(e){"
+           "d.setAttribute('data-theme',s==='dark'?'dark':'light')}catch(e){"
            "document.documentElement.setAttribute('data-theme','light')}})()" % KEY)
+# cờ data-clip cho .ovs-line: tràn thật mới mờ mép. Bỏ qua phần tử đang hover/focus — không thì bung ra → hết tràn → gỡ cờ → co lại → nhấp nháy.
+# Theo dõi DOM đổi (trang dựng bằng JS như nightshift) + resize, gộp một lần mỗi khung hình.
+LINE_JS = ("(function(){var q=0,t=0;"
+           # hàng flex ngang ≥ 2 mục nhỏ (≤ 64px) rơi xuống ≥ 2 dòng → gắn ovs-line (cùng tiêu chí luật row-wrap của html-visual-gate)
+           "function auto(){t=Date.now();var A=document.querySelectorAll('body *');for(var i=0;i<A.length;i++){var e=A[i];if(e.classList.contains('ovs-line')||/^H[1-6]$/.test(e.tagName))continue;"
+           "var c=getComputedStyle(e);if(c.display.indexOf('flex')<0||c.flexDirection.indexOf('row')!==0||c.flexWrap==='nowrap')continue;var K=[],hs=0,mn=1e9;"
+           "for(var k=e.firstElementChild;k;k=k.nextElementSibling){var kc=getComputedStyle(k),r=k.getBoundingClientRect();if(r.width<=1||r.height<=1||kc.position==='absolute'||kc.position==='fixed')continue;"
+           "if(kc.flexBasis==='100%'){K=[];break}K.push(r);hs=Math.max(hs,r.height);mn=Math.min(mn,r.height)}if(K.length<2||hs>64)continue;"
+           "for(var n=1;n<K.length;n++)if(Math.abs(K[n].top-K[0].top)>=mn/2){e.classList.add('ovs-line');break}}}"
+           "function m(){q=0;if(Date.now()-t>500)auto();var L=document.querySelectorAll('.ovs-line');for(var i=0;i<L.length;i++){var e=L[i];"
+           "if(e.matches(':hover,:focus-within'))continue;var c=e.scrollWidth>e.clientWidth+1;if(c!==e.hasAttribute('data-clip'))e.toggleAttribute('data-clip',c)}}"
+           "function s(){if(!q)q=requestAnimationFrame(m)}function r(){t=0;s()}new MutationObserver(s).observe(document.documentElement,{childList:true,subtree:true,characterData:true});"
+           "addEventListener('resize',r);addEventListener('load',r);document.addEventListener('mouseout',s)})();")
+LINE_TAG = f'<script id="ovs-line">{LINE_JS}</script>'
 TOGGLE_HTML = ('<button type="button" class="ovs-theme" role="switch" aria-label="Đổi giao diện sáng / tối" title="Đổi giao diện sáng / tối">'
                '<i aria-hidden="true"></i><span></span></button>')
 TOGGLE_JS = ("(function(){var d=document.documentElement,b=document.querySelector('.ovs-theme');if(!b)return;"
@@ -85,7 +122,7 @@ TOGGLE_JS = ("(function(){var d=document.documentElement,b=document.querySelecto
 # Trang CON trong iframe: không có nút; lấy theme của trang mẹ lúc mở (cùng origin thì đọc thẳng) và nghe postMessage khi mẹ đổi.
 FOLLOW_JS = ("(function(){var d=document.documentElement;function set(t){if(t==='dark'||t==='light')d.setAttribute('data-theme',t)}"
              "try{set(parent.document.documentElement.getAttribute('data-theme'))}catch(e){}"
-             "if(!d.getAttribute('data-theme'))set(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');"
+             "if(!d.getAttribute('data-theme'))set('light');"
              "window.addEventListener('message',function(e){if(e.data&&e.data.ovsTheme)set(e.data.ovsTheme)})})()")
 
 
@@ -101,12 +138,31 @@ def has_own_theme(html: str) -> bool:
     return dark_css and toggler
 
 
+def _shell(html: str) -> str:
+    """Bộ khung trang tài liệu (html_shell.py, PLAN 220926) — chỉ khi file có mặt; engine không mang file này nên trang graph không đổi."""
+    f = HERE / "html_shell.py"
+    if not f.is_file():
+        return html
+    try:                                   # lỗi ở bộ khung trên trang lạ KHÔNG được làm sập mọi generator (review t8 #10)
+        s = importlib.util.spec_from_file_location("ovs_html_shell", f); m = importlib.util.module_from_spec(s); s.loader.exec_module(m)
+        return m.apply(html)
+    except Exception as e:                 # noqa: BLE001 — fail-open có tên
+        sys.stderr.write(f"[html_base] bỏ qua bộ khung trang tài liệu: {type(e).__name__}: {e}\n")
+        return html
+
+
 def apply(html: str, *, toggle: bool = True, fix=None) -> str:
     if f'id="{STYLE_ID}"' in html:                                  # lớp nền đã có (template/trang cũ): LÀM MỚI khối nền + khối font về bản hiện tại
         def _fresh(m):                                              # giữ lựa chọn family_dark của lần chèn đầu (khối cũ có luật body tối hay không)
             return f'<style id="{STYLE_ID}">{base_css(family_dark="html[data-theme=dark] body{" in m.group(0))}</style>'
         html = re.sub(rf'<style id="{STYLE_ID}">.*?</style\s*>', _fresh, html, count=1, flags=re.S)
-        return _font_mod().apply(html, _from_base=True)
+        html = re.sub(r'<script id="ovs-line">.*?</script\s*>', "", html, flags=re.S)                        # hàng một dòng (24/09): làm mới / chèn
+        html = re.sub(rf'(<style id="{STYLE_ID}">.*?</style\s*>)', lambda _m: _m.group(1) + LINE_TAG, html, count=1, flags=re.S)
+        fixer = HERE / "html-slop-fix.py"              # vá lại cả trang ĐÃ có lớp nền — trước 22/09 nhánh này bỏ qua vá, nên phép vá
+        if (fix is None and fixer.is_file()) or fix:  # mới (khoảng cách về thang) không bao giờ tới trang cũ. Mọi phép vá idempotent.
+            s_ = importlib.util.spec_from_file_location("ovs_slop_fix", fixer); fm = importlib.util.module_from_spec(s_); s_.loader.exec_module(fm)
+            html = fm.fix_markup(html, [])
+        return _shell(_font_mod().apply(html, _from_base=True))
     # Tự VÁ slop máy-làm-được trước khi gắn lớp nền (mặc định BẬT khi có html-slop-fix.py cạnh file này — repo engine không mang
     # công cụ vá nên ở đó tự tắt): generator nào còn màu ghi cứng/sọc/gradient-text cũng ra trang sạch, không chờ ai nhớ chạy tay.
     fixer = HERE / "html-slop-fix.py"
@@ -127,7 +183,7 @@ def apply(html: str, *, toggle: bool = True, fix=None) -> str:
     font = _font_mod()
     html = font.apply(html, _from_base=True)                        # font + trỏ stack hệ thống trong <head> về token
     m = re.search(r"</head\s*>", html, re.I)
-    html = html[:m.start()] + f'<style id="{STYLE_ID}">{base_css(family_dark=not head_dark)}</style>' + html[m.start():]
+    html = html[:m.start()] + f'<style id="{STYLE_ID}">{base_css(family_dark=not head_dark)}</style>' + LINE_TAG + html[m.start():]
     if own:
         return html
     ho = re.search(r"<head\b[^>]*>", html, re.I)
@@ -143,7 +199,7 @@ def apply(html: str, *, toggle: bool = True, fix=None) -> str:
     if bodies:                                                      # </body> CUỐI CÙNG — cái trước có thể nằm trong srcdoc/JS
         i = bodies[-1].start()
         html = html[:i] + TOGGLE_HTML + f"<script>{TOGGLE_JS}</script>" + html[i:]
-    return html
+    return _shell(html)
 
 
 def to_follow(html: str) -> str:
@@ -164,7 +220,7 @@ def to_follow(html: str) -> str:
 # Trang MẸ có toggle RIÊNG (overstack, graph-viz): báo theme cho mọi iframe con mỗi khi data-theme đổi và khi iframe vừa tải xong.
 # (iframe sandbox không cùng origin nên con KHÔNG đọc được trang mẹ — chỉ còn đường postMessage.)
 PARENT_NOTIFY_JS = ("(function(){var d=document.documentElement;function cur(){var t=d.getAttribute('data-theme');"
-                    "return t==='dark'||t==='light'?t:(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light')}"
+                    "return t==='dark'?'dark':'light'}"
                     "function tell(f){try{f.contentWindow.postMessage({ovsTheme:cur()},'*')}catch(e){}}"
                     "function all(){[].forEach.call(document.querySelectorAll('iframe'),tell)}"
                     "new MutationObserver(all).observe(d,{attributes:true,attributeFilter:['data-theme']});"
