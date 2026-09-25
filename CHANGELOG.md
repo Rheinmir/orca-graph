@@ -1,5 +1,14 @@
 # Changelog
 
+## 3.2.2 — 2026-09-25
+
+### Fixed
+- Windows (Python native): `orca-graph.py`, `graph-viz.py`, `graph-atlas.py` ép stdout/stderr sang UTF-8 — trước đây cp1252 làm `print` tiếng Việt crash `UnicodeEncodeError` (Rheinmir/setup GH#169).
+- `install.sh` (đường raw không git) kéo thêm `Newsreader-NOTICE.txt` — font tiêu đề Newsreader đã nhúng từ 3.2.0 nhưng giấy phép SIL OFL chưa đi cùng.
+
+### Changed
+- `graph-viz`: khoảng cách CSS về thang bội số 4/8px (padding, gap, margin) và nhãn nav đậm hơn, khớp thang khoảng cách của lớp nền framework.
+
 ## 3.2.1 — 2026-09-25
 
 ### Changed

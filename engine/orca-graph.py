@@ -29,13 +29,16 @@ Luật một dòng của rubric: đúng 1 · sai 0 · không-biết 0.3 · gợi
 """
 import argparse, contextlib, hashlib, json, os, posixpath, re, shutil, subprocess, sys, time
 from pathlib import Path
+for _s in (sys.stdout, sys.stderr):  # Windows (Python native): stdout cp1252 → print tiếng Việt crash (Rheinmir/setup GH#169)
+    try: _s.reconfigure(encoding="utf-8", errors="replace")
+    except Exception: pass
 
 # GH#166: **Verify:**/**QC:** do người/agent viết theo thói quen bash; shell=True mặc định là /bin/sh → cú pháp
 # chỉ-bash (vd `<(...)`) fail rc=2 và bị đọc nhầm là verify đỏ. Có bash thì chạy bằng bash, không thì lùi về sh.
 SHELL = shutil.which("bash")
 
 SCHEMA = 1
-VERSION = "3.2.1"
+VERSION = "3.2.2"
 STATES = ["proposed", "ready", "locked", "dispatched", "done", "done_unverified",
           "done_user_reported", "failed", "unknown", "blocked"]
 TERMINAL_OK = {"done", "done_user_reported"}

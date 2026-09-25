@@ -8,6 +8,9 @@ Usage: graph-atlas.py <dir> [-o out.html]
 """
 import argparse, html, importlib.util, json, sys, time
 from pathlib import Path
+for _s in (sys.stdout, sys.stderr):  # Windows (Python native): stdout cp1252 → print tiếng Việt crash (Rheinmir/setup GH#169)
+    try: _s.reconfigure(encoding="utf-8", errors="replace")
+    except Exception: pass
 
 _spec = importlib.util.spec_from_file_location("graph_viz", Path(__file__).with_name("graph-viz.py"))
 viz = importlib.util.module_from_spec(_spec); _spec.loader.exec_module(viz)
@@ -83,7 +86,7 @@ def build(d: Path, out: Path) -> None:
 <h2 id="lien-he">Liên hệ giữa graph (khớp artifact)</h2><table><tr><th>Graph</th><th>Trỏ tới</th><th>Qua file</th><th>Kiểu</th></tr>{link_rows}</table>'''
     extra_css = """
 .atlas{height:min(78vh,760px)}.atlas .canvas{position:absolute;left:0;top:0;transform-origin:0 0}
-.tile{position:absolute;padding:0;overflow:hidden}.tile .th{display:flex;align-items:center;gap:10px;padding:8px 12px;border-bottom:1px solid var(--border);font-size:12px}
+.tile{position:absolute;padding:0;overflow:hidden}.tile .th{display:flex;align-items:center;gap:12px;padding:8px 12px;border-bottom:1px solid var(--border);font-size:12px}
 .tile .th span{color:var(--t2);font-size:10.5px;flex:1}.tile .open{color:var(--accent);text-decoration:none;font-size:14px}
 .tile .mini{padding:8px;overflow:hidden}.tile .mini svg{position:static;transform:none}
 .wires{position:absolute;left:0;top:0;pointer-events:none}.wires .wire{fill:none;stroke:var(--accent);stroke-width:2;stroke-dasharray:8 6;opacity:.7;pointer-events:stroke}

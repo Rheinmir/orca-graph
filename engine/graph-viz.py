@@ -9,6 +9,9 @@ Module: graph-atlas.py import lại `layout()`, `svg()`, `page()` từ đây (m�
 """
 import argparse, html, json, os, sys, time, zlib
 from pathlib import Path
+for _s in (sys.stdout, sys.stderr):  # Windows (Python native): stdout cp1252 → print tiếng Việt crash (Rheinmir/setup GH#169)
+    try: _s.reconfigure(encoding="utf-8", errors="replace")
+    except Exception: pass
 
 # Node = khối {shape+icon theo KIND, viền màu theo STATE, caption id}. IR = nửa cạnh/bán kính
 # icon; W,H = hộp bao NGUYÊN NODE (icon + khoảng cách + caption) dùng cho layout cột/hàng;
@@ -186,29 +189,29 @@ nav::before{content:"";position:absolute;inset:0;pointer-events:none;background:
 html:not([data-theme=light]) nav,html[data-theme=dark] nav{background:linear-gradient(180deg,rgba(30,38,56,.7),rgba(24,30,44,.5) 55%,rgba(30,38,56,.62))}
 @media (prefers-color-scheme: light){html:not([data-theme=dark]) nav{background:linear-gradient(180deg,rgba(255,255,255,.62),rgba(255,255,255,.38) 55%,rgba(255,255,255,.5))}}
 body.nav-collapsed nav{transform:translateX(-100%)}
-nav .brand{font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--t2);padding:0 18px 10px}
-nav a{display:block;padding:7px 18px;font-size:12px;color:var(--t1);text-decoration:none}
+nav .brand{font-size:18px;font-weight:700;letter-spacing:-.015em;color:var(--accent-ink);padding:0 20px 12px}
+nav a{display:block;padding:8px 20px;font-size:13px;font-weight:500;color:var(--t1);text-decoration:none}
 nav a:hover{background:var(--glass1);color:var(--accent-ink)}
-nav .grp{font-size:10.5px;color:var(--t2);padding:12px 18px 4px;text-transform:uppercase;letter-spacing:.06em}
+nav .grp{font-size:11px;font-weight:700;color:var(--t1);padding:20px 20px 4px;text-transform:uppercase;letter-spacing:.08em}
 .nav-close{position:absolute;top:10px;right:10px;width:26px;height:26px;border:0;border-radius:8px;background:var(--glass1);color:var(--t2);cursor:pointer}
 .nav-toggle{position:fixed;top:12px;left:12px;width:32px;height:32px;border:1px solid var(--border);border-radius:10px;background:var(--glass1);backdrop-filter:blur(14px);cursor:pointer;z-index:6;transition:opacity .2s}
 body:not(.nav-collapsed) .nav-toggle{opacity:0;pointer-events:none}
-.theme-row{position:sticky;bottom:calc(-1 * var(--nav-pad-y));margin-top:auto;display:flex;align-items:center;justify-content:space-between;padding:11px 16px;
+.theme-row{position:sticky;bottom:calc(-1 * var(--nav-pad-y));margin-top:auto;display:flex;align-items:center;justify-content:space-between;padding:12px 16px;
  border-top:1px solid var(--border);background:var(--glass1);backdrop-filter:blur(14px);font-size:12px;color:var(--t2)}
 .theme-switch{cursor:pointer}.theme-switch .track{display:inline-block;position:relative;width:50px;height:26px;border-radius:999px;background:#cfe0fa;border:1px solid var(--border);font-size:11px;line-height:26px}
 .theme-switch .track::before{content:'☀️';position:absolute;left:6px}.theme-switch .track::after{content:'🌙';position:absolute;right:6px}
 .theme-switch .knob{position:absolute;top:2px;left:2px;width:20px;height:20px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.25);transition:left .18s;z-index:1}
 .theme-switch.on .knob{left:26px}.theme-switch.on .track{background:#2b3a5c}
-main{max-width:1180px;margin:0 auto;padding:28px 28px 60px}
-h1{font-size:22px;margin:6px 0 4px;letter-spacing:-.01em}h2{font-size:15px;margin:30px 0 10px}.sub{color:var(--t2);font-size:12.5px}
-.chips{display:flex;flex-wrap:wrap;gap:8px;margin:14px 0}.chip{padding:4px 10px;border-radius:999px;font-size:11px;background:var(--glass2);border:1px solid var(--border)}
+main{max-width:1180px;margin:0 auto;padding:32px 32px 64px}
+h1{font-size:22px;margin:8px 0 4px;letter-spacing:-.01em}h2{font-size:15px;margin:32px 0 12px}.sub{color:var(--t2);font-size:12.5px}
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin:16px 0}.chip{padding:4px 12px;border-radius:999px;font-size:11px;background:var(--glass2);border:1px solid var(--border);min-height:24px}
 .chip b{color:var(--accent-ink)}
 .card,.diagram-box{background:var(--glass2);backdrop-filter:blur(18px) saturate(1.1);border:1px solid var(--border);border-radius:var(--r);
- box-shadow:inset 0 1px 0 rgba(255,255,255,.55),0 8px 30px rgba(20,60,120,.08);padding:14px 16px}
+ box-shadow:inset 0 1px 0 rgba(255,255,255,.55),0 8px 30px rgba(20,60,120,.08);padding:16px 16px}
 .diagram-box{padding:0;overflow:hidden;position:relative;height:min(62vh,560px)}
 .diagram-box .pan{position:absolute;inset:0;cursor:grab}.diagram-box .pan:active{cursor:grabbing}
 .diagram-box svg{position:absolute;left:0;top:0;transform-origin:0 0;will-change:transform}
-.diagram-box .tools{position:absolute;right:10px;top:10px;display:flex;gap:6px;z-index:2}
+.diagram-box .tools{position:absolute;right:10px;top:10px;display:flex;gap:8px;z-index:2}
 .diagram-box .tools button{width:28px;height:28px;border:1px solid var(--border);border-radius:8px;background:var(--glass1);backdrop-filter:blur(12px);color:var(--t1);cursor:pointer;font-size:13px}
 svg .edge{fill:none;stroke:var(--edge);stroke-width:1.6;opacity:.85}svg .edge.pref{opacity:.5}svg .edge.gate{stroke:#d97706}svg .conflict{fill:none;stroke:#ef4444;stroke-width:1.6;stroke-dasharray:4 4;opacity:.85}
 svg .node:focus{outline:none}svg .node:focus-visible circle,svg .node:focus-visible rect{stroke-width:4}
@@ -217,17 +220,17 @@ svg .node.dim{opacity:.22}svg .edge.dim{opacity:.1}svg .edge.hot{stroke-width:2.
 svg text{fill:var(--t1);font-family:inherit;pointer-events:none}svg .nid{font-size:10px;font-weight:600}svg .nicon{font-size:15px}
 svg .st{font-weight:400;fill:var(--t2);font-size:10.5px}svg .ttl{font-size:11.5px}svg .meta{font-size:10px;fill:var(--t2)}
 #node-inspector{margin-top:12px;min-height:44px}#node-inspector .placeholder{margin:0;font-style:italic}
-.legend{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:11px;color:var(--t2);margin:10px 2px}.legend i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:5px;vertical-align:-1px}
+.legend{display:flex;flex-wrap:wrap;gap:8px 16px;font-size:11px;color:var(--t2);margin:12px 2px}.legend i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:4px;vertical-align:-1px}
 table{width:100%;border-collapse:collapse;font-size:12.5px;background:var(--glass3);backdrop-filter:blur(20px);border:1px solid var(--border);border-radius:var(--r);overflow:hidden}
-th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--border);vertical-align:top}th{font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;color:var(--t2)}
-tr:last-child td{border-bottom:0}code,.path{font:11.5px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;background:var(--glass1);padding:1px 5px;border-radius:5px;display:inline-block;margin-block:5px}
+th,td{text-align:left;padding:8px 12px;border-bottom:1px solid var(--border);vertical-align:top}th{font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;color:var(--t2)}
+tr:last-child td{border-bottom:0}code,.path{font:11.5px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;background:var(--glass1);padding:1px 4px;border-radius:5px;display:inline-block;margin-block:4px}
 .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px}.node-card{scroll-margin-top:20px}.node-card h3{margin:0 0 4px;font-size:13px}
-.node-card .st,.st-badge{font-size:10.5px;padding:2px 8px;border-radius:999px;margin-left:6px;vertical-align:1px}
-.node-card ul{margin:6px 0 0;padding-left:16px;font-size:12px;color:var(--t2)}.node-card li b{color:var(--t1)}
+.node-card .st,.st-badge{font-size:10.5px;padding:2px 8px;border-radius:999px;margin-left:8px;vertical-align:1px}
+.node-card ul{margin:8px 0 0;padding-left:16px;font-size:12px;color:var(--t2)}.node-card li b{color:var(--t1)}
 .gloss dt{font-weight:600;font-size:12.5px;margin-top:8px}.gloss dd{margin:2px 0 0;font-size:12px;color:var(--t2)}
-footer{margin-top:40px;color:var(--t2);font-size:11px}footer .path{display:inline-block;margin-top:6px;user-select:all}
-.badge{display:inline-block;padding:1px 7px;border-radius:999px;font-size:10.5px;border:1px solid var(--border);background:var(--glass1)}
-@media (max-width:640px){body{padding-left:0}main{padding:18px 14px}}
+footer{margin-top:40px;color:var(--t2);font-size:11px}footer .path{display:inline-block;margin-top:8px;user-select:all}
+.badge{display:inline-block;padding:1px 8px;border-radius:999px;font-size:10.5px;border:1px solid var(--border);background:var(--glass1)}
+@media (max-width:640px){body{padding-left:0}main{padding:20px 16px}}
 """ + _dark_css()
 
 JS = r"""
