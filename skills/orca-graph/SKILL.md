@@ -1,6 +1,6 @@
 ---
 name: orca-graph
-description: Phân việc dạng ĐỒ THỊ PHỤ THUỘC trên PLAN.md — trả lời 5 câu hỏi (task này cần việc gì · cái gì chạy song song · phụ thuộc vào gì · tồn tại để làm gì trong graph · liên hệ graph cũ) bằng tool tất định, dispatch theo lớp topo có KHOÁ + lease + generation, state lưu bền append-only (events.jsonl), 2 file python vẽ (1 graph / atlas 2D mọi graph), mọi câu trả lời của model gắn nhãn chắc|gợi-ý|không-biết + nguồn, audit bịa=0. Gọi khi user nói "orca-graph", "graph phân việc", "task nào song song", "phụ thuộc gì", "vẽ graph task", "dispatch theo graph", "/orca-graph".
+description: Phân việc dạng ĐỒ THỊ PHỤ THUỘC trên PLAN.md — trả lời 5 câu hỏi (task này cần việc gì · cái gì chạy song song · phụ thuộc vào gì · tồn tại để làm gì trong graph · liên hệ graph cũ) bằng tool tất định, dispatch theo lớp topo có KHOÁ + lease + generation, state lưu bền append-only (events.jsonl), 1 file python vẽ trang graph, mọi câu trả lời của model gắn nhãn chắc|gợi-ý|không-biết + nguồn, audit bịa=0. Gọi khi user nói "orca-graph", "graph phân việc", "task nào song song", "phụ thuộc gì", "vẽ graph task", "dispatch theo graph", "/orca-graph".
 metadata:
   design-standard: "solid-what-how/1"
   contract-version: "1.1.0"
@@ -10,10 +10,10 @@ metadata:
 
 Nhánh của `orca-workflow`: cùng propose → gate → plan → dispatch, nhưng **deps là DỮ LIỆU** (graph.json),
 không phải suy đoán trong đầu. Runtime: `harness/scripts/orca-graph.py`. Vẽ: `fdk/tools/graph-viz.py`
-(1 graph) + `fdk/tools/graph-atlas.py` (atlas 2D). Store mặc định `llmwiki/graph/`.
+(1 graph). Store mặc định `llmwiki/graph/`.
 
 **Engine sống ở repo riêng** `https://github.com/Rheinmir/orca-graph` (test + bộ eval VT + lịch sử riêng), cài vào
-`~/.orca-graph/repo/`. Ba đường dẫn ở trên trong overstack là **shim** trỏ sang engine đó — lệnh gõ y như cũ. Shim báo
+`~/.orca-graph/repo/`. Hai đường dẫn ở trên trong overstack là **shim** trỏ sang engine đó — lệnh gõ y như cũ. Shim báo
 "chưa cài engine" (rc 3) → chạy đúng lệnh nó in ra: `curl -fsSL https://raw.githubusercontent.com/Rheinmir/orca-graph/main/install.sh | bash`.
 Không có overstack: gọi thẳng `~/.orca-graph/bin/orca-graph`.
 
@@ -30,7 +30,7 @@ Không có overstack: gọi thẳng `~/.orca-graph/bin/orca-graph`.
   Ngoài phạm vi PRD (nói thẳng, không giả vờ có): PostgreSQL ledger, secret gateway, ngân sách tiền, LangGraph, integration queue/candidate hash, compensation cho effect ngoài, sandbox process-level (chạy lệnh agent trong container/VM riêng). Tool này là file-based cho một máy; cần những thứ trên thì đó là engine khác, không phải nâng cấp orca-graph. (Allow-list GHI file — khác sandbox process — đã có, xem `run --strict` ở mục Reference — Daemon & control-room bên dưới và GH#162.)
 
 ### Mental model
-`PLAN.md → build → graph.json (cache) + events.jsonl (nguồn chân lý, append-only) → ask (5 câu hỏi) → next/lock/set/run theo lớp topo → verify (+ qc) → audit → graph-viz / graph-atlas / control-room`.
+`PLAN.md → build → graph.json (cache) + events.jsonl (nguồn chân lý, append-only) → ask (5 câu hỏi) → next/lock/set/run theo lớp topo → verify (+ qc) → audit → graph-viz / control-room`.
 
 Máy state mỗi node:
 `proposed → ready (mọi deps xong) → locked → dispatched → done | done_unverified | failed | unknown`; `blocked` = HITL chờ người.
@@ -50,7 +50,7 @@ Luật vay từ Reprise PRD: op_key idempotent · CAS `--if-rev` · generation c
 | Out | `<id>.graph.json` + `<id>.events.jsonl` + `.locks/` | có | graph + state bền |
 | Out | output `build` | có | cycle, deps suy luận (`gợi-ý`), xung đột ghi cùng file giữa 2 node song song |
 | Out | answer có nhãn + nguồn | khi model trả lời | chấm theo rubric 1 / 0 / 0.3 / 0.5 / bịa 0 |
-| Out | HTML graph + atlas 2D + `control-room.html` | có | 2 file python vẽ + generator control-room |
+| Out | HTML graph + `control-room.html` | có | 1 file python vẽ + generator control-room |
 | Out | `audit-log.jsonl` | khi kết | kết quả mở lại từng nguồn, bịa = 0 |
 
 ### Rules và capabilities
@@ -59,11 +59,11 @@ Luật vay từ Reprise PRD: op_key idempotent · CAS `--if-rev` · generation c
 - RULE-03 (MUST): **Mọi câu trả lời của model về graph phải qua `answer`** với nhãn + nguồn mở được. Không có nguồn → chọn `không-biết` (0.3) thay vì bịa (0).
 - RULE-04 (MUST): Deps `gợi-ý` (suy luận) phải được user xác nhận hoặc khai `**Depends:**` trước khi dispatch lớp đó.
 - RULE-05 (MUST): Không xoá/sửa tay `events.jsonl`; sai thì append event sửa. `graph.json` chỉ là cache — hỏng thì `build` lại, state fold từ events.
-- RULE-06 (MUST): HTML sinh ra: toggle sáng/tối + full path + thuật ngữ có giải nghĩa (luật fdk) — 2 file vẽ đã lo, đừng viết HTML tay.
+- RULE-06 (MUST): HTML sinh ra: toggle sáng/tối + full path + thuật ngữ có giải nghĩa (luật fdk) — file vẽ đã lo, đừng viết HTML tay.
 - RULE-08 (MUST): **Tranh chấp tài nguyên KHÔNG phải cạnh DAG** (PRD v1.1 §23.2). Hai task độc lập dùng chung nhánh tích hợp / schema DB / cổng test / quota API → khai `**Resources:**`, để `lock` tuần tự hoá lúc chạy; ĐỪNG thêm `**Depends:**` giả. Worktree riêng không miễn claim.
 - RULE-09 (MUST): `audit-edges` chỉ ĐỌC và chỉ ĐỀ XUẤT. Cạnh thiếu lý do (`EDGE_UNJUSTIFIED`) thì GIỮ và hỏi user; "không thấy dependency" không bằng "đã chứng minh độc lập". Bỏ cạnh = user đồng ý → sửa PLAN → build lại.
 - RULE-10 (MUST): User yêu cầu THÊM việc vào graph đang chạy → `add-node` (nó sửa PLAN gốc rồi build lại, `plan_version + 1`, lịch sử giữ nguyên). Cấm vá tay `graph.json`; cấm tạo graph mới cho cùng một goal.
-- RULE-07 (MUST): Không làm được (nói thẳng): coupling ngầm không lộ ra file; rollback tự động khi agent chết nửa chừng; sync 2 chiều với sổ Orca; atlas > ~500 node cần graphviz; allow-list chỉ soát filesystem, không soát network/process/secret access.
+- RULE-07 (MUST): Không làm được (nói thẳng): coupling ngầm không lộ ra file; rollback tự động khi agent chết nửa chừng; sync 2 chiều với sổ Orca; allow-list chỉ soát filesystem, không soát network/process/secret access.
 - Capabilities: đọc PLAN và file dự án; ghi store graph append-only + khoá file; spawn và theo dõi process agent (heartbeat theo pid); chạy lệnh verify/qc; đọc diff git để soát allow-list; sinh HTML tĩnh. Mirror một chiều sang sổ điều phối ngoài là tuỳ chọn.
 
 ### Failure boundaries
@@ -87,7 +87,7 @@ Luật vay từ Reprise PRD: op_key idempotent · CAS `--if-rev` · generation c
 | W04 | judgment | graph | Bước 3: 5 câu hỏi bằng `ask` trước, model sau qua `answer` kèm nhãn + nguồn | answer có nhãn | không nguồn → không-biết |
 | W05 | effect | graph.json | Bước 4: vẽ `graph-viz.py` → gửi HTML cho user duyệt (`gate-create`) | HTML + gate | kind lạ → B06 |
 | W06 | effect | graph đã duyệt | Bước 5: vòng `next` → `lock` → `set dispatched` → dispatch → `set done` tới khi `next` báo hoàn tất | node done | lease hết → B05 |
-| W07 | deterministic | graph xong | Bước 6: `audit <id>` → `graph-atlas.py llmwiki/graph/` → problem-tree nếu lộ vấn đề | audit-log + atlas | bịa > 0 → báo |
+| W07 | deterministic | graph xong | Bước 6: `audit <id>` → problem-tree nếu lộ vấn đề | audit-log | bịa > 0 → báo |
 
 Chi tiết từng bước (nguồn chân lý cho W01–W07; bước 0–6 ứng với W01–W07):
 
@@ -111,7 +111,7 @@ Chi tiết từng bước (nguồn chân lý cho W01–W07; bước 0–6 ứng 
    ```
    Agent im lặng quá lease → `next` tự đẩy node về `unknown` → `reconcile <id> <n>` (chạy verify) trước khi lock lại. Tối đa 3 attempt.
    Muốn mirror sang sổ Orca: `sync-orca <id> --run` (một chiều; sổ Orca runtime-global, đóng dấu dự án).
-6. **Kết:** `audit <id>` (mở lại từng nguồn; bịa = 0; ghi `audit-log.jsonl`) → `graph-atlas.py llmwiki/graph/` regen atlas → cập nhật problem-tree nếu lộ vấn đề quy trình.
+6. **Kết:** `audit <id>` (mở lại từng nguồn; bịa = 0; ghi `audit-log.jsonl`) → cập nhật problem-tree nếu lộ vấn đề quy trình.
 
 ### Branches
 | ID | Kind | Guard | Hành vi | Skip / failure | Rejoin |
@@ -131,7 +131,7 @@ Chi tiết từng bước (nguồn chân lý cho W01–W07; bước 0–6 ứng 
 Tất định: `done` chỉ khi `verify` rc 0 (và QC nếu khai); lease/generation/op_key/CAS do tool quyết; `check-cycles` và `lint`/`build --strict` rc 2 khi hỏng; `audit` mở lại từng nguồn, bịa = 0. Cần người: duyệt HTML graph ở gate, xác nhận deps `gợi-ý`, xử lý node `blocked`. Vòng chạy dừng khi `next` báo hoàn tất; mỗi node tối đa 3 attempt.
 
 ### Examples
-- **Positive:** PLAN 5 task, t2 và t3 cùng Depends t1 → `build` báo không cycle, không xung đột file → `ask t2 parallel` trả t3 → `next` cấp t1, xong thì cấp t2 + t3 song song mỗi cái một `lock --by`, `set done --gen` → `audit` bịa = 0 → atlas regen.
+- **Positive:** PLAN 5 task, t2 và t3 cùng Depends t1 → `build` báo không cycle, không xung đột file → `ask t2 parallel` trả t3 → `next` cấp t1, xong thì cấp t2 + t3 song song mỗi cái một `lock --by`, `set done --gen` → `audit` bịa = 0.
 - **Boundary/failure:** t2 và t3 song song cùng ghi `src/api.ts` → `build` in ⚠ xung đột ghi cùng file → thêm `**Depends:** Task 2` vào t3 để ép tuần tự rồi build lại; agent t3 im quá lease → `unknown` → `reconcile` chạy verify trước khi lock lại.
 - **Boundary:** model muốn nói "t4 tồn tại để mở khoá release" nhưng không có nguồn mở được → `answer … --label không-biết` (0.3), không gắn `chắc`.
 
@@ -172,5 +172,5 @@ Tất định: `done` chỉ khi `verify` rc 0 (và QC nếu khai); lease/generat
 - Sống/chết ≠ đúng/sai: daemon chỉ biết process còn hay mất; `done` hay làm lại vẫn do `verify` quyết. Process sống mà treo thì heartbeat vẫn xanh — đặt `**Verify:**` idempotent và trần thời gian theo node.
 
 ### Reference — Recap
-`/orca-graph` = PLAN → graph.json có deps → `ask` trả lời 5 câu hỏi tất định → dispatch theo lớp có khoá/lease/gen → state bền append-only → `answer`/`audit` chấm model theo rubric 1/0/0.3/0.5/bịa=0 → HTML 1 graph + atlas 2D.
+`/orca-graph` = PLAN → graph.json có deps → `ask` trả lời 5 câu hỏi tất định → dispatch theo lớp có khoá/lease/gen → state bền append-only → `answer`/`audit` chấm model theo rubric 1/0/0.3/0.5/bịa=0 → HTML 1 graph.
 Use-case bất ngờ: chạy `build` trên PLAN cũ đã làm xong để **kiểm lại** xem hồi đó có 2 task ghi cùng file mà chạy song song không; hoặc `related` để thấy PLAN mới chạm file nào của PLAN cũ trước khi đụng.

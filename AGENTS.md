@@ -12,7 +12,7 @@
 | Trình cài engine vào `~/.orca-graph/repo` | `install.sh` |
 
 ## KHÔNG thuộc repo này — ở overstack (Rheinmir/setup, nhánh `orca`)
-- 3 **shim** giữ đường dẫn cũ: `harness/scripts/orca-graph.py`, `fdk/tools/graph-viz.py`, `fdk/tools/graph-atlas.py`. Chỉ tìm engine rồi `exec`; KHÔNG chứa logic. Sửa logic vào shim là sai chỗ.
+- 2 **shim** giữ đường dẫn cũ: `harness/scripts/orca-graph.py`, `fdk/tools/graph-viz.py` (shim `graph-atlas.py` đã gỡ 30/09/2026 — overstack không còn sinh atlas). Chỉ tìm engine rồi `exec`; KHÔNG chứa logic. Sửa logic vào shim là sai chỗ.
 - Cockpit `fdk/tools/build-control-room.py` (cần `overstack_paths`), hook nhắc goal→graph, skill `/tc-run`.
 - Option cài "orca-graph đã tick sẵn": `harness/poc-vendor-neutral/install.sh` + test `harness/tests/install-graph-option-test.sh`, `test_control_room.py`.
 - Bản MIRROR của SKILL.md + provenance ghim commit: `skills/orca-graph/SKILL.md`, `fdk/skills.provenance.json`.

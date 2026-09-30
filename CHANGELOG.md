@@ -1,5 +1,11 @@
 # Changelog
 
+## 3.2.3 — 2026-09-30
+
+### Changed
+- Skill `/orca-graph` không còn bước sinh atlas: bước 6 (W07) chỉ còn `audit` → problem-tree; bỏ atlas khỏi mô tả, mental model, bảng output và ví dụ. Lý do: trang atlas dồn mọi graph thành một hàng thẻ không đọc được và không công cụ nào đọc nó; thông tin "graph nào chạm cùng file" đã có ở `ask <id> related` và mục "Liên hệ graph cũ" của từng trang graph. `engine/graph-atlas.py` vẫn còn trong repo cho ai cần chạy tay.
+- `AGENTS.md`: overstack chỉ còn 2 shim (`orca-graph.py`, `graph-viz.py`); shim `graph-atlas.py` và link atlas trong cockpit, hook goal đã gỡ bên overstack.
+
 ## 3.2.2 — 2026-09-25
 
 ### Fixed
