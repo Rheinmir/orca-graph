@@ -32,6 +32,8 @@ raw_install(){ # không git (hoặc bản cài cũ kiểu raw): kéo đúng 4 fi
   say "tải file engine từ $RAW (không có git)"
   mkdir -p "$DEST/engine"
   for f in orca-graph.py graph-viz.py graph-atlas.py kind-glyphs.json html_font.py html_font_data.py html_base.py BeVietnamPro-NOTICE.txt Newsreader-NOTICE.txt; do curl -fsSL "$RAW/engine/$f" -o "$DEST/engine/$f"; done
+  mkdir -p "$DEST/engine/assets/fonts"   # ribbon "Overstack" của html_base đọc font lúc chạy
+  for f in Chomsky-mast.woff2 Chomsky-NOTICE.txt; do curl -fsSL "$RAW/engine/assets/fonts/$f" -o "$DEST/engine/assets/fonts/$f"; done
 }
 
 if [ -L "$DEST" ]; then

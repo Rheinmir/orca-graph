@@ -1,5 +1,14 @@
 # Changelog
 
+## 3.2.4 — 2026-10-06
+
+### Changed
+- Đồng bộ lớp nền từ framework (`html_base.py`, `html_font.py`): favicon chữ "O" của Overstack thay favicon xanh cũ, ribbon "Overstack" (font Chomsky, `engine/assets/fonts/`), thang tiêu đề ép chữ "x" theo Be Vietnam Pro, chữ nội dung mặc định 14px.
+- `install.sh` (đường raw, không git) tải thêm `engine/assets/fonts/Chomsky-*`.
+
+### Fixed
+- Trang mẹ nhúng trang con qua `srcdoc` mất ribbon và giữ favicon cũ: `data-ovs-theme-follow` giờ chỉ xét trên thẻ `<html>` mở đầu.
+
 ## 3.2.3 — 2026-09-30
 
 ### Changed

@@ -38,7 +38,7 @@ for _s in (sys.stdout, sys.stderr):  # Windows (Python native): stdout cp1252 â†
 SHELL = shutil.which("bash")
 
 SCHEMA = 1
-VERSION = "3.2.3"
+VERSION = "3.2.4"
 STATES = ["proposed", "ready", "locked", "dispatched", "done", "done_unverified",
           "done_user_reported", "failed", "unknown", "blocked"]
 TERMINAL_OK = {"done", "done_user_reported"}
